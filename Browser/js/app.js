@@ -4,27 +4,37 @@
 
 // Native Electron Window Bridge
 let ipcRenderer = null;
-try {
-  if (typeof require !== 'undefined') {
-    const electron = require('electron');
-    ipcRenderer = electron.ipcRenderer;
-  }
-} catch(e) {}
+
+function getIpc() {
+  if (ipcRenderer) return ipcRenderer;
+  try {
+    if (typeof require !== 'undefined') {
+      const electron = require('electron');
+      ipcRenderer = electron.ipcRenderer;
+    } else if (window.electron && window.electron.ipcRenderer) {
+      ipcRenderer = window.electron.ipcRenderer;
+    }
+  } catch(e) {}
+  return ipcRenderer;
+}
 
 window.CoffeeApp = {
   minimizeWindow: () => {
-    if (ipcRenderer) {
-      ipcRenderer.send('window-minimize');
+    const ipc = getIpc();
+    if (ipc && typeof ipc.send === 'function') {
+      ipc.send('window-minimize');
     }
   },
   maximizeWindow: () => {
-    if (ipcRenderer) {
-      ipcRenderer.send('window-maximize');
+    const ipc = getIpc();
+    if (ipc && typeof ipc.send === 'function') {
+      ipc.send('window-maximize');
     }
   },
   closeWindow: () => {
-    if (ipcRenderer) {
-      ipcRenderer.send('window-close');
+    const ipc = getIpc();
+    if (ipc && typeof ipc.send === 'function') {
+      ipc.send('window-close');
     } else {
       window.close();
     }
@@ -32,6 +42,30 @@ window.CoffeeApp = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Bind Window Controls (Minimize, Maximize, Close)
+  const minBtn = document.getElementById('win-min-btn');
+  const maxBtn = document.getElementById('win-max-btn');
+  const closeBtn = document.getElementById('win-close-btn');
+
+  if (minBtn) {
+    minBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      window.CoffeeApp.minimizeWindow();
+    });
+  }
+  if (maxBtn) {
+    maxBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      window.CoffeeApp.maximizeWindow();
+    });
+  }
+  if (closeBtn) {
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      window.CoffeeApp.closeWindow();
+    });
+  }
+
   // Apply saved roast theme
   document.documentElement.dataset.roast = window.BrowserState.roast;
 

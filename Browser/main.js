@@ -203,22 +203,25 @@ function createWindow() {
 }
 
 // Native Window Controls IPC
-ipcMain.on('window-minimize', () => {
-  if (mainWindow) mainWindow.minimize();
+ipcMain.on('window-minimize', (event) => {
+  const win = (event && event.sender) ? (BrowserWindow.fromWebContents(event.sender) || mainWindow) : mainWindow;
+  if (win) win.minimize();
 });
 
-ipcMain.on('window-maximize', () => {
-  if (mainWindow) {
-    if (mainWindow.isMaximized()) {
-      mainWindow.unmaximize();
+ipcMain.on('window-maximize', (event) => {
+  const win = (event && event.sender) ? (BrowserWindow.fromWebContents(event.sender) || mainWindow) : mainWindow;
+  if (win) {
+    if (win.isMaximized()) {
+      win.unmaximize();
     } else {
-      mainWindow.maximize();
+      win.maximize();
     }
   }
 });
 
-ipcMain.on('window-close', () => {
-  if (mainWindow) mainWindow.close();
+ipcMain.on('window-close', (event) => {
+  const win = (event && event.sender) ? (BrowserWindow.fromWebContents(event.sender) || mainWindow) : mainWindow;
+  if (win) win.close();
 });
 
 // Telemetry: Real System RAM calculation across active non-Efficiency Mode processes

@@ -266,6 +266,9 @@
   margin-left: auto;
   height: 100%;
   -webkit-app-region: no-drag !important;
+  pointer-events: auto !important;
+  z-index: 99999;
+  position: relative;
 }
 
 .win-btn {
@@ -280,6 +283,9 @@
   cursor: pointer;
   transition: all var(--transition-fast);
   -webkit-app-region: no-drag !important;
+  pointer-events: auto !important;
+  z-index: 99999;
+  position: relative;
 }
 
 .win-btn:hover {
