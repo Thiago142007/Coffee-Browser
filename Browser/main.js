@@ -136,7 +136,6 @@ function createWindow() {
     title: 'Coffee Browser',
     icon: appIcon,
     frame: false, // 100% Frameless custom window
-    titleBarStyle: 'hidden',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: true,
