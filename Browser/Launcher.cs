@@ -8,18 +8,25 @@ namespace CoffeeBrowserLauncher
     static class Program
     {
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
             try
             {
                 string currentDir = AppDomain.CurrentDomain.BaseDirectory;
                 string distExe = Path.Combine(currentDir, "dist", "CoffeeBrowser-win32-x64", "CoffeeBrowser.exe");
 
+                string arguments = "";
+                if (args != null && args.Length > 0)
+                {
+                    arguments = string.Join(" ", Array.ConvertAll(args, a => "\"" + a.Replace("\"", "\\\"") + "\""));
+                }
+
                 if (File.Exists(distExe))
                 {
                     Process.Start(new ProcessStartInfo
                     {
                         FileName = distExe,
+                        Arguments = arguments,
                         WorkingDirectory = Path.GetDirectoryName(distExe)
                     });
                     return;
@@ -29,10 +36,16 @@ namespace CoffeeBrowserLauncher
                 string electronExe = Path.Combine(currentDir, "node_modules", "electron", "dist", "electron.exe");
                 if (File.Exists(electronExe))
                 {
+                    string electronArgs = string.Format("\"{0}\"", currentDir);
+                    if (!string.IsNullOrEmpty(arguments))
+                    {
+                        electronArgs += " " + arguments;
+                    }
+
                     Process.Start(new ProcessStartInfo
                     {
                         FileName = electronExe,
-                        Arguments = string.Format("\"{0}\"", currentDir),
+                        Arguments = electronArgs,
                         WorkingDirectory = currentDir
                     });
                     return;
@@ -43,6 +56,7 @@ namespace CoffeeBrowserLauncher
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = htmlPath,
+                    Arguments = arguments,
                     UseShellExecute = true
                 });
             }

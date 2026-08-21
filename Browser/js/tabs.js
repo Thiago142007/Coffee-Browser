@@ -67,6 +67,16 @@ class CoffeeTabsManager {
     return newTab;
   }
 
+  openExternalUrl(url) {
+    if (!url) return;
+    const currentTab = window.BrowserState ? window.BrowserState.tabs.find(t => t.id === window.BrowserState.activeTabId) : null;
+    if (currentTab && (currentTab.url === 'cafe://newtab' || currentTab.url === 'coffee://newtab' || currentTab.url === 'about:blank' || !currentTab.url)) {
+      this.navigateActiveTab(url);
+    } else {
+      this.createTab(url);
+    }
+  }
+
   openSettings(section = '') {
     const targetUrl = 'cafe://settings';
 

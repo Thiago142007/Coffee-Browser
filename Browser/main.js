@@ -7,6 +7,83 @@ if (process.platform === 'win32') {
   app.setAppUserModelId('com.coffeebrowser.app');
 }
 
+// Single Instance Lock — Ensure links clicked in other apps open in the existing browser instance
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+      const targetUrl = extractUrlFromArgs(commandLine);
+      if (targetUrl) {
+        openUrlInRenderer(targetUrl);
+      }
+    }
+  });
+}
+
+// Register as default protocol client for web browsing
+try {
+  if (process.defaultApp) {
+    if (process.argv.length >= 2) {
+      app.setAsDefaultProtocolClient('http', process.execPath, [path.resolve(process.argv[1])]);
+      app.setAsDefaultProtocolClient('https', process.execPath, [path.resolve(process.argv[1])]);
+      app.setAsDefaultProtocolClient('coffee', process.execPath, [path.resolve(process.argv[1])]);
+    }
+  } else {
+    app.setAsDefaultProtocolClient('http');
+    app.setAsDefaultProtocolClient('https');
+    app.setAsDefaultProtocolClient('coffee');
+  }
+} catch(e) {}
+
+// Extract URL or web document from CLI arguments (e.g. when launched via Windows shell, protocol or default browser)
+function extractUrlFromArgs(argv) {
+  if (!Array.isArray(argv)) return null;
+  for (let i = 1; i < argv.length; i++) {
+    const arg = argv[i];
+    if (!arg || typeof arg !== 'string') continue;
+    const clean = arg.trim().replace(/^["']|["']$/g, '');
+    if (clean.startsWith('--') || clean.startsWith('-')) continue;
+    if (clean === '.' || clean.endsWith('main.js') || clean.endsWith('electron.exe') || clean.endsWith('CoffeeBrowser.exe')) continue;
+    if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('cafe://') || clean.startsWith('coffee://') || clean.startsWith('file://')) {
+      return clean;
+    }
+    if (/^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(\/.*)?$/.test(clean)) {
+      return 'https://' + clean;
+    }
+    if (fs.existsSync(clean) && (clean.endsWith('.html') || clean.endsWith('.htm') || clean.endsWith('.xhtml') || clean.endsWith('.pdf'))) {
+      return 'file://' + path.resolve(clean).replace(/\\/g, '/');
+    }
+  }
+  return null;
+}
+
+function openUrlInRenderer(url) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.executeJavaScript(`
+    if (window.CoffeeTabs) {
+      if (typeof window.CoffeeTabs.openExternalUrl === 'function') {
+        window.CoffeeTabs.openExternalUrl(${JSON.stringify(url)});
+      } else {
+        window.CoffeeTabs.createTab(${JSON.stringify(url)});
+      }
+    }
+  `).catch(() => {});
+}
+
+// macOS Protocol event
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+    openUrlInRenderer(url);
+  }
+});
+
 // Enforce Dark Mode by default across all Chromium web contents & engine
 nativeTheme.themeSource = 'dark';
 app.commandLine.appendSwitch('force-dark-mode');
@@ -210,6 +287,15 @@ function createWindow() {
   mainWindow.on('restore', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('window-state-changed', { isMaximized: mainWindow.isMaximized() });
+    }
+  });
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    const initialUrl = extractUrlFromArgs(process.argv);
+    if (initialUrl) {
+      setTimeout(() => {
+        openUrlInRenderer(initialUrl);
+      }, 400);
     }
   });
 
