@@ -928,6 +928,5 @@ window.showSettingsSection = function(sectionId) {
   else if (sectionId === 'about') contentPane.innerHTML = renderer.renderSettingsAboutSection();
   else if (sectionId === 'downloads') contentPane.innerHTML = renderer.renderSettingsDownloadsSection();
 };
-};
 
 window.CoffeePagesRenderer = new PagesContentRenderer();
