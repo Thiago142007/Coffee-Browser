@@ -280,7 +280,15 @@ class CoffeeDownloadManager {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  window.CoffeeDownloads = new CoffeeDownloadManager();
-  window.CoffeeDownloads.init();
-});
+function initCoffeeDownloads() {
+  if (!window.CoffeeDownloads) {
+    window.CoffeeDownloads = new CoffeeDownloadManager();
+    window.CoffeeDownloads.init();
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initCoffeeDownloads);
+} else {
+  initCoffeeDownloads();
+}

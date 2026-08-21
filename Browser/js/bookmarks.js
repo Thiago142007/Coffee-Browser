@@ -364,8 +364,6 @@ class CoffeeBookmarksManager {
         <span>${t('bookmarks_delete_btn', 'Remover')}</span>
       </div>
     `;
-      </div>
-    `;
 
     const editBtn = this.contextMenu.querySelector('#ctx-edit-bm');
     if (editBtn) {

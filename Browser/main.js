@@ -138,6 +138,7 @@ function createWindow() {
     frame: false, // 100% Frameless custom window
     titleBarStyle: 'hidden',
     webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: true,
       contextIsolation: false,
       webviewTag: true, // Enables <webview> tags for full Chromium embedded instances per tab
@@ -195,6 +196,24 @@ function createWindow() {
     }
   });
 
+  mainWindow.on('maximize', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('window-state-changed', { isMaximized: true });
+    }
+  });
+
+  mainWindow.on('unmaximize', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('window-state-changed', { isMaximized: false });
+    }
+  });
+
+  mainWindow.on('restore', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('window-state-changed', { isMaximized: mainWindow.isMaximized() });
+    }
+  });
+
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
 
   mainWindow.on('closed', function () {
@@ -202,45 +221,65 @@ function createWindow() {
   });
 }
 
+function getTargetWindow(event) {
+  if (event && event.sender) {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win && !win.isDestroyed()) return win;
+  }
+  if (mainWindow && !mainWindow.isDestroyed()) return mainWindow;
+  const focused = BrowserWindow.getFocusedWindow();
+  if (focused && !focused.isDestroyed()) return focused;
+  const all = BrowserWindow.getAllWindows();
+  return all.length > 0 ? all[0] : null;
+}
+
 // Native Window Controls IPC
 ipcMain.on('window-minimize', (event) => {
-  const win = (event && event.sender) ? (BrowserWindow.fromWebContents(event.sender) || mainWindow) : mainWindow;
-  if (win) win.minimize();
+  const win = getTargetWindow(event);
+  if (win && !win.isDestroyed()) {
+    win.minimize();
+  }
 });
 
 ipcMain.on('window-maximize', (event) => {
-  const win = (event && event.sender) ? (BrowserWindow.fromWebContents(event.sender) || mainWindow) : mainWindow;
-  if (win) {
+  const win = getTargetWindow(event);
+  if (win && !win.isDestroyed()) {
     if (win.isMaximized()) {
       win.unmaximize();
     } else {
       win.maximize();
     }
+    if (!win.isDestroyed()) {
+      win.webContents.send('window-state-changed', { isMaximized: win.isMaximized() });
+    }
   }
 });
 
 ipcMain.on('window-close', (event) => {
-  const win = (event && event.sender) ? (BrowserWindow.fromWebContents(event.sender) || mainWindow) : mainWindow;
-  if (win) win.close();
+  const win = getTargetWindow(event);
+  if (win && !win.isDestroyed()) {
+    win.close();
+  }
 });
 
-// Telemetry: Real System RAM calculation across active non-Efficiency Mode processes
+ipcMain.handle('is-window-maximized', (event) => {
+  const win = getTargetWindow(event);
+  return win && !win.isDestroyed() ? win.isMaximized() : false;
+});
+
+// Telemetry: Real Total RAM calculation across all browser processes
 ipcMain.handle('get-system-memory', async () => {
   try {
     let totalKB = 0;
     if (app && typeof app.getAppMetrics === 'function') {
       const metrics = app.getAppMetrics();
       for (const m of metrics) {
-        // Exclude processes running in Efficiency Mode (Windows EcoQoS / throttled background processes)
-        if (m.efficiencyMode === true) {
-          continue;
-        }
         if (m.memory && typeof m.memory.workingSetSize === 'number') {
           totalKB += m.memory.workingSetSize;
         }
       }
     }
-    // Fallback if no non-efficiency metrics found
+    // Fallback to process RSS memory if getAppMetrics is empty
     if (totalKB === 0 && process.memoryUsage) {
       totalKB = Math.round(process.memoryUsage().rss / 1024);
     }
@@ -252,6 +291,50 @@ ipcMain.handle('get-system-memory', async () => {
     }
     return { workingSetKB: rss };
   }
+});
+
+// Telemetry: Ultra-low latency network ping
+ipcMain.handle('get-network-latency', async () => {
+  const net = require('net');
+  const hosts = [
+    { host: '1.1.1.1', port: 80 },
+    { host: '1.0.0.1', port: 80 },
+    { host: '8.8.8.8', port: 53 },
+    { host: '1.1.1.1', port: 443 }
+  ];
+
+  for (const target of hosts) {
+    try {
+      const ping = await new Promise((resolve) => {
+        const start = performance.now();
+        const socket = new net.Socket();
+        let finished = false;
+
+        const finish = (val) => {
+          if (finished) return;
+          finished = true;
+          try { socket.destroy(); } catch(e) {}
+          resolve(val);
+        };
+
+        socket.setTimeout(1800);
+
+        socket.connect(target.port, target.host, () => {
+          const rtt = Math.max(1, Math.round(performance.now() - start));
+          finish(rtt);
+        });
+
+        socket.on('error', () => finish(-1));
+        socket.on('timeout', () => finish(-1));
+      });
+
+      if (ping > 0) {
+        return { latencyMs: ping };
+      }
+    } catch(e) {}
+  }
+
+  return { latencyMs: -1 };
 });
 
 // ==========================================

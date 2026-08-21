@@ -20,7 +20,7 @@
   border-bottom: 1px solid var(--line);
   flex-shrink: 0;
   z-index: 100;
-  -webkit-app-region: drag;
+  -webkit-app-region: no-drag;
   user-select: none;
 }
 
@@ -32,7 +32,18 @@
   background: linear-gradient(180deg, var(--bg-subtle) 0%, var(--bg) 100%);
   gap: 8px;
   position: relative;
-  -webkit-app-region: drag;
+  -webkit-app-region: no-drag !important;
+}
+
+.titlebar-drag-region {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 150px;
+  height: 100%;
+  -webkit-app-region: drag !important;
+  pointer-events: none;
+  z-index: 1;
 }
 
 /* Brand Pill */
@@ -281,11 +292,19 @@
   background: transparent;
   color: var(--t2);
   cursor: pointer;
+  outline: none;
   transition: all var(--transition-fast);
   -webkit-app-region: no-drag !important;
   pointer-events: auto !important;
   z-index: 99999;
   position: relative;
+  user-select: none;
+}
+
+.win-btn svg,
+.win-btn svg * {
+  pointer-events: none !important;
+  -webkit-app-region: no-drag !important;
 }
 
 .win-btn:hover {

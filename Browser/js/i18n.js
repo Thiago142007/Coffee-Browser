@@ -50,6 +50,7 @@
       app_desc: 'Coffee Browser — Navegador web de alta performance com arquitetura de privacidade e proteção ativa de dados.',
       minimize: 'Minimizar',
       maximize: 'Maximizar',
+      restore: 'Restaurar',
       close: 'Fechar',
       back: 'Voltar',
       forward: 'Avançar',
@@ -253,6 +254,7 @@
       app_desc: 'Coffee Browser — High-performance web browser with privacy-first architecture and active protection.',
       minimize: 'Minimize',
       maximize: 'Maximize',
+      restore: 'Restore',
       close: 'Close',
       back: 'Back',
       forward: 'Forward',
@@ -438,6 +440,7 @@
       app_desc: 'Coffee Browser — Navegador web de alto rendimiento con privacidad y protección activa.',
       minimize: 'Minimizar',
       maximize: 'Maximizar',
+      restore: 'Restaurar',
       close: 'Cerrar',
       back: 'Atrás',
       forward: 'Adelante',
@@ -623,6 +626,7 @@
       app_desc: 'Coffee Browser — Navigateur haute performance axé sur la confidentialité et la vitesse.',
       minimize: 'Réduire',
       maximize: 'Agrandir',
+      restore: 'Restaurer',
       close: 'Fermer',
       back: 'Précédent',
       forward: 'Suivant',
@@ -808,6 +812,7 @@
       app_desc: 'Coffee Browser — Schneller Browser mit Fokus auf Privatsphäre und aktiven Schutz.',
       minimize: 'Minimieren',
       maximize: 'Maximieren',
+      restore: 'Wiederherstellen',
       close: 'Schließen',
       back: 'Zurück',
       forward: 'Vorwärts',
@@ -993,6 +998,7 @@
       app_desc: 'Coffee Browser — Browser web ad alte prestazioni focalizzato su privacy e velocità.',
       minimize: 'Riduci a icona',
       maximize: 'Ingrandisci',
+      restore: 'Ripristina',
       close: 'Chiudi',
       back: 'Indietro',
       forward: 'Avanti',
@@ -1178,6 +1184,7 @@
       app_desc: 'Coffee Browser — プライバシーと高速性を重視したターミナルスタイルの次世代ブラウザ。',
       minimize: '最小化',
       maximize: '最大化',
+      restore: '元に戻す',
       close: '閉じる',
       back: '戻る',
       forward: '進む',
@@ -1363,6 +1370,7 @@
       app_desc: 'Coffee Browser — 极速、隐私优先的终端风格现代化桌面浏览器。',
       minimize: '最小化',
       maximize: '最大化',
+      restore: '还原',
       close: '关闭',
       back: '后退',
       forward: '前进',
@@ -1548,6 +1556,7 @@
       app_desc: 'Coffee Browser — Высокопроизводительный веб-браузер с упором на приватность и защиту данных.',
       minimize: 'Свернуть',
       maximize: 'Развернуть',
+      restore: 'Восстановить',
       close: 'Закрыть',
       back: 'Назад',
       forward: 'Вперед',
@@ -1897,7 +1906,9 @@
       const winMinBtn = document.getElementById('win-min-btn');
       if (winMinBtn) winMinBtn.title = this.t('minimize');
       const winMaxBtn = document.getElementById('win-max-btn');
-      if (winMaxBtn) winMaxBtn.title = this.t('maximize');
+      if (winMaxBtn) {
+        winMaxBtn.title = (typeof isWindowMaximized !== 'undefined' && isWindowMaximized) ? this.t('restore') : this.t('maximize');
+      }
       const winCloseBtn = document.getElementById('win-close-btn');
       if (winCloseBtn) winCloseBtn.title = this.t('close');
 

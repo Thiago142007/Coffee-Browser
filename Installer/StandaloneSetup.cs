@@ -709,7 +709,19 @@ namespace CoffeeBrowserInstaller
 
                 // STRATEGY 1: Extract Embedded Resource Payload (Self-Contained inside this single .exe)
                 Assembly asm = Assembly.GetExecutingAssembly();
-                Stream resStream = asm.GetManifestResourceStream("CoffeeBrowserPayload");
+                Stream resStream = null;
+                foreach (string name in asm.GetManifestResourceNames())
+                {
+                    if (name.EndsWith("payload.zip", StringComparison.OrdinalIgnoreCase) || name.IndexOf("payload", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        resStream = asm.GetManifestResourceStream(name);
+                        break;
+                    }
+                }
+                if (resStream == null)
+                {
+                    resStream = asm.GetManifestResourceStream("CoffeeBrowserPayload");
+                }
 
                 if (resStream != null)
                 {
@@ -718,28 +730,7 @@ namespace CoffeeBrowserInstaller
 
                     using (ZipArchive archive = new ZipArchive(resStream, ZipArchiveMode.Read))
                     {
-                        int total = archive.Entries.Count;
-                        int current = 0;
-                        foreach (ZipArchiveEntry entry in archive.Entries)
-                        {
-                            string targetPath = Path.Combine(destinationPath, entry.FullName);
-                            if (string.IsNullOrEmpty(entry.Name))
-                            {
-                                Directory.CreateDirectory(targetPath);
-                            }
-                            else
-                            {
-                                string parent = Path.GetDirectoryName(targetPath);
-                                if (!Directory.Exists(parent)) Directory.CreateDirectory(parent);
-                                entry.ExtractToFile(targetPath, true);
-                            }
-                            current++;
-                            if (current % 10 == 0 || current == total)
-                            {
-                                int p = 25 + (int)((double)current / total * 45);
-                                UpdateProgress(p, string.Format("Extraindo: {0} ({1}/{2})", entry.Name, current, total));
-                            }
-                        }
+                        ExtractZipArchiveSafely(archive, destinationPath);
                     }
                     extracted = true;
                     AppendLog("Extração do pacote autônomo concluída com sucesso!", ColorGreen);
@@ -755,7 +746,11 @@ namespace CoffeeBrowserInstaller
                     {
                         UpdateProgress(30, "Extraindo de payload.zip local...");
                         AppendLog("Extraindo arquivo: " + localZip, ColorAmber);
-                        ZipFile.ExtractToDirectory(localZip, destinationPath);
+                        using (FileStream fs = File.OpenRead(localZip))
+                        using (ZipArchive archive = new ZipArchive(fs, ZipArchiveMode.Read))
+                        {
+                            ExtractZipArchiveSafely(archive, destinationPath);
+                        }
                         extracted = true;
                         AppendLog("Extração local concluída!", ColorGreen);
                     }
@@ -888,6 +883,45 @@ namespace CoffeeBrowserInstaller
             }
         }
 
+        private void ExtractZipArchiveSafely(ZipArchive archive, string destDir)
+        {
+            int total = archive.Entries.Count;
+            int current = 0;
+            foreach (ZipArchiveEntry entry in archive.Entries)
+            {
+                current++;
+                try
+                {
+                    string targetPath = Path.Combine(destDir, entry.FullName);
+                    if (string.IsNullOrEmpty(entry.Name))
+                    {
+                        if (!Directory.Exists(targetPath)) Directory.CreateDirectory(targetPath);
+                    }
+                    else
+                    {
+                        string parent = Path.GetDirectoryName(targetPath);
+                        if (!Directory.Exists(parent)) Directory.CreateDirectory(parent);
+                        
+                        try
+                        {
+                            entry.ExtractToFile(targetPath, true);
+                        }
+                        catch (Exception)
+                        {
+                            // If file already exists and cannot be overwritten (e.g. locked or present), skip it
+                        }
+                    }
+                }
+                catch {}
+
+                if (current % 10 == 0 || current == total)
+                {
+                    int p = 25 + (int)((double)current / total * 45);
+                    UpdateProgress(p, string.Format("Extraindo: {0} ({1}/{2})", entry.Name, current, total));
+                }
+            }
+        }
+
         private void CopyDirectory(string sourceDir, string destDir)
         {
             if (!Directory.Exists(destDir)) Directory.CreateDirectory(destDir);
@@ -895,7 +929,14 @@ namespace CoffeeBrowserInstaller
             {
                 string fName = Path.GetFileName(file);
                 if (fName == "package-lock.json") continue;
-                File.Copy(file, Path.Combine(destDir, fName), true);
+                try
+                {
+                    File.Copy(file, Path.Combine(destDir, fName), true);
+                }
+                catch (Exception)
+                {
+                    // If file already exists, skip it
+                }
             }
             foreach (string sub in Directory.GetDirectories(sourceDir))
             {

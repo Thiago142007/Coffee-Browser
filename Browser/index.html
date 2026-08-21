@@ -25,6 +25,9 @@
     <!-- 1. Window Header: Titlebar & Tab Strip -->
     <header class="browser-header">
       <div class="titlebar-and-tabs">
+        <!-- Dedicated Drag Region (never overlaps window-controls) -->
+        <div class="titlebar-drag-region"></div>
+
         <!-- Brand Pill -->
         <div class="brand-pill" id="brand-pill" title="Coffee Browser">
           <img src="assets/logo.jpg" style="width:16px; height:16px; border-radius:4px; object-fit:cover;" alt="Logo">
@@ -35,14 +38,15 @@
         <div class="tab-strip" id="tab-strip"></div>
 
         <!-- Window Controls -->
-        <div class="window-controls">
-          <button class="win-btn" id="win-min-btn" title="Minimizar" onclick="window.CoffeeApp && window.CoffeeApp.minimizeWindow()">
+        <div class="window-controls" id="window-controls">
+          <button class="win-btn" id="win-min-btn" title="Minimizar" type="button" aria-label="Minimizar" onclick="window.CoffeeApp && window.CoffeeApp.minimizeWindow()">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
           </button>
-          <button class="win-btn" id="win-max-btn" title="Maximizar" onclick="window.CoffeeApp && window.CoffeeApp.maximizeWindow()">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/></svg>
+          <button class="win-btn" id="win-max-btn" title="Maximizar" type="button" aria-label="Maximizar" onclick="window.CoffeeApp && window.CoffeeApp.maximizeWindow()">
+            <svg class="icon-max" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/></svg>
+            <svg class="icon-restore" style="display:none;" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="8" width="14" height="14" rx="1.5" ry="1.5"/><path d="M8 8V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2"/></svg>
           </button>
-          <button class="win-btn close" id="win-close-btn" title="Fechar" onclick="window.CoffeeApp && window.CoffeeApp.closeWindow()">
+          <button class="win-btn close" id="win-close-btn" title="Fechar" type="button" aria-label="Fechar" onclick="window.CoffeeApp && window.CoffeeApp.closeWindow()">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
@@ -307,6 +311,8 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       </button>
     </div>
+  </div>
+
   <!-- Crash Recovery / Session Restore Popup -->
   <div id="session-restore-popup" class="session-restore-popup" style="display:none;">
     <div class="restore-popup-icon">

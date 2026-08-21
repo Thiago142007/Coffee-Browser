@@ -134,7 +134,10 @@ html, body {
   display: flex;
   align-items: center;
   gap: 6px;
-  -webkit-app-region: no-drag;
+  -webkit-app-region: no-drag !important;
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 9999;
 }
 
 .win-control-btn {
@@ -149,6 +152,15 @@ html, body {
   color: var(--mut);
   cursor: pointer;
   transition: all var(--transition-fast);
+  -webkit-app-region: no-drag !important;
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 9999;
+}
+
+.win-control-btn svg,
+.win-control-btn svg * {
+  pointer-events: none !important;
 }
 
 .win-control-btn:hover {
