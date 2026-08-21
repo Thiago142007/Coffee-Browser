@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Instalador do Coffee Browser</title>
+  <link rel="stylesheet" href="css/installer.css">
+</head>
+<body>
+
+  <div class="installer-window">
+    <div class="grain-overlay"></div>
+
+    <!-- 1. Window Titlebar -->
+    <header class="installer-titlebar">
+      <div class="titlebar-brand">
+        <img src="assets/logo.jpg" alt="Coffee Browser" class="titlebar-logo" id="titlebar-logo">
+        <span class="titlebar-title">
+          COFFEE BROWSER <span class="titlebar-badge">v1.0.0 SETUP</span>
+        </span>
+      </div>
+
+      <div class="titlebar-controls">
+        <button class="win-control-btn" id="win-min-btn" title="Minimizar">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <button class="win-control-btn close-btn" id="win-close-btn" title="Fechar">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- 2. Step Indicator Navigation Bar -->
+    <nav class="installer-steps-bar">
+      <div class="step-indicator active" id="step-nav-1">
+        <span class="step-number">1</span>
+        <span>Boas-Vindas</span>
+      </div>
+      <div class="step-indicator" id="step-nav-2">
+        <span class="step-number">2</span>
+        <span>Personalização</span>
+      </div>
+      <div class="step-indicator" id="step-nav-3">
+        <span class="step-number">3</span>
+        <span>Instalação</span>
+      </div>
+      <div class="step-indicator" id="step-nav-4">
+        <span class="step-number">4</span>
+        <span>Conclusão</span>
+      </div>
+    </nav>
+
+    <!-- 3. Main Wizard Content -->
+    <main class="installer-body">
+
+      <!-- STEP 1: Welcome & Overview -->
+      <section class="wizard-step active" id="step-1">
+        <div class="welcome-hero">
+          <div class="hero-logo-box">
+            <img src="assets/logo.jpg" alt="Logo" class="hero-logo-img">
+            <div class="steam-anim"></div>
+          </div>
+          <div class="hero-text">
+            <h1>Instalação do Coffee Browser ☕</h1>
+            <p>Deguste uma nova forma de navegar na web: ultra-rápido, esteticamente artesanal, com bloqueador de anúncios nativo e privacidade total.</p>
+          </div>
+        </div>
+
+        <div class="features-grid">
+          <div class="feature-pill-card">
+            <div class="feature-icon-box">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <div class="feature-info">
+              <h4>Coador AdBlock Nativo</h4>
+              <p>Bloqueio implacável de rastreadores, anúncios e scripts espiões em toda a web.</p>
+            </div>
+          </div>
+
+          <div class="feature-pill-card">
+            <div class="feature-icon-box">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+            </div>
+            <div class="feature-info">
+              <h4>Design & Modo Torra</h4>
+              <p>Interface Dark Roast aconchegante com opções de Torra Clara, Média e Escura.</p>
+            </div>
+          </div>
+
+          <div class="feature-pill-card">
+            <div class="feature-icon-box">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            </div>
+            <div class="feature-info">
+              <h4>DNS Cloudflare 1.1.1.1</h4>
+              <p>Resolução DNS criptografada por DoH por padrão, acelerando consultas e buscas.</p>
+            </div>
+          </div>
+
+          <div class="feature-pill-card">
+            <div class="feature-icon-box">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </div>
+            <div class="feature-info">
+              <h4>Zero Telemetria</h4>
+              <p>Sem rastreamento corporativo. Seus dados e seu histórico pertencem a você.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- STEP 2: Customization & Directory Options -->
+      <section class="wizard-step" id="step-2">
+        <h2 class="step-title">Personalização e Opções de Instalação</h2>
+        <p class="step-subtitle">Escolha como o Coffee Browser será configurado no seu sistema.</p>
+
+        <!-- Roast Theme Selection -->
+        <div class="section-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/></svg>
+          Escolha a Torra Inicial do seu Navegador:
+        </div>
+
+        <div class="roast-grid">
+          <div class="roast-card" data-roast="claro" onclick="selectRoast('claro')">
+            <div class="roast-card-header">
+              <span class="roast-name">Torra Clara</span>
+              <span class="roast-dot claro"></span>
+            </div>
+            <p class="roast-desc">Tons quentes de caramelo suave e contraste aconchegante.</p>
+          </div>
+
+          <div class="roast-card selected" data-roast="medio" onclick="selectRoast('medio')">
+            <div class="roast-card-header">
+              <span class="roast-name">Torra Média</span>
+              <span class="roast-dot medio"></span>
+            </div>
+            <p class="roast-desc">Equilíbrio perfeito de tons café com leite e âmbar brilhante.</p>
+          </div>
+
+          <div class="roast-card" data-roast="escuro" onclick="selectRoast('escuro')">
+            <div class="roast-card-header">
+              <span class="roast-name">Torra Escura</span>
+              <span class="roast-dot escuro"></span>
+            </div>
+            <p class="roast-desc">Preto profundo minimalista com visual moderno terminal.</p>
+          </div>
+        </div>
+
+        <!-- Destination Folder -->
+        <div class="install-path-group">
+          <div class="section-label">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            Pasta de Instalação:
+          </div>
+          <div class="path-input-row">
+            <input type="text" class="path-input" id="dest-path-input" spellcheck="false" value="">
+            <button class="browse-btn" id="browse-folder-btn">Procurar...</button>
+          </div>
+        </div>
+
+        <!-- Shortcuts & Integrations -->
+        <div class="section-label">Integração com o Windows:</div>
+        <div class="options-list">
+          <label class="custom-checkbox-row">
+            <input type="checkbox" id="chk-desktop-shortcut" checked>
+            <span>Criar atalho na Área de Trabalho (Desktop)</span>
+          </label>
+          <label class="custom-checkbox-row">
+            <input type="checkbox" id="chk-startmenu-shortcut" checked>
+            <span>Adicionar ao Menu Iniciar do Windows</span>
+          </label>
+          <label class="custom-checkbox-row">
+            <input type="checkbox" id="chk-autostart" checked>
+            <span>Iniciar o Coffee Browser automaticamente com o Windows (Inicialização)</span>
+          </label>
+          <label class="custom-checkbox-row">
+            <input type="checkbox" id="chk-default-browser" checked>
+            <span>Definir o Coffee Browser como o navegador padrão do sistema</span>
+          </label>
+          <label class="custom-checkbox-row">
+            <input type="checkbox" id="chk-enable-coador" checked>
+            <span>Ativar Coador AdBlock e proteção de rastreadores nativamente</span>
+          </label>
+        </div>
+      </section>
+
+      <!-- STEP 3: Active Installation Stream -->
+      <section class="wizard-step" id="step-3">
+        <div class="installing-header">
+          <div class="installing-status-text">
+            <span class="animate-spin-slow">☕</span>
+            <span id="install-status-label">Preparando instalação do Coffee Browser...</span>
+          </div>
+          <div class="installing-percentage" id="install-percentage-label">0%</div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" id="progress-bar-fill"></div>
+        </div>
+
+        <!-- Terminal Stream Log Box -->
+        <div class="terminal-stream-card">
+          <div class="terminal-stream-header">
+            <span>TERMINAL DE INSTALAÇÃO — LOGS EM TEMPO REAL</span>
+            <span style="color:var(--green)">● ATIVO</span>
+          </div>
+          <div class="terminal-stream-logs" id="terminal-stream-logs">
+            <div class="log-entry info"><span>[0.0s]</span> <span>Iniciando rotina de instalação do Coffee Browser...</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- STEP 4: Success & Finished -->
+      <section class="wizard-step" id="step-4">
+        <div class="finished-card">
+          <div class="finished-icon-badge">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <h2>Instalação Concluída com Sucesso!</h2>
+          <p>O Coffee Browser foi instalado e configurado perfeitamente no seu computador. Sua xícara de navegação rápida e privativa está servida.</p>
+
+          <div class="finished-summary-box">
+            <div class="summary-row">
+              <span class="summary-label">Local de Instalação:</span>
+              <span class="summary-val" id="summary-path-val">C:\Users\...\CoffeeBrowser</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">Torra Selecionada:</span>
+              <span class="summary-val" id="summary-roast-val">Torra Média</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">Proteção & Escudos:</span>
+              <span class="summary-val" style="color:var(--green)">Coador AdBlock Ativo</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 14px; display: flex; justify-content: center;">
+          <label class="custom-checkbox-row" style="font-weight: 600;">
+            <input type="checkbox" id="chk-launch-now" checked>
+            <span>Iniciar o Coffee Browser imediatamente</span>
+          </label>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- 4. Footer Action Buttons -->
+    <footer class="installer-footer">
+      <div class="footer-left">
+        <button class="btn btn-secondary" id="btn-cancel">Cancelar</button>
+      </div>
+
+      <div class="footer-right">
+        <button class="btn btn-secondary" id="btn-back" style="display:none;">← Voltar</button>
+        <button class="btn btn-primary" id="btn-next">Avançar →</button>
+      </div>
+    </footer>
+
+  </div>
+
+  <script src="js/installer.js"></script>
+</body>
+</html>

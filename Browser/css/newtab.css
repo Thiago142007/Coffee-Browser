@@ -1,0 +1,290 @@
+/* Coffee Browser New Tab Dashboard (Brave Style) */
+
+.newtab-dashboard {
+  min-height: 100%;
+  width: 100%;
+  background: radial-gradient(circle at 50% 10%, var(--card) 0%, var(--bg) 80%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 24px 60px;
+  position: relative;
+  overflow-y: auto;
+}
+
+/* Background Atmosphere Glow */
+.newtab-dashboard::before {
+  content: "";
+  position: absolute;
+  top: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 350px;
+  background: radial-gradient(ellipse at center, rgba(217, 119, 6, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* Top Dashboard Header Stats (Shields Summary) */
+.dashboard-stats-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  padding: 16px 32px;
+  box-shadow: var(--shadow-md);
+  margin-bottom: 36px;
+  max-width: 860px;
+  width: 100%;
+  backdrop-filter: blur(8px);
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  position: relative;
+}
+
+.stat-item:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  right: -16px;
+  top: 10%;
+  height: 80%;
+  width: 1px;
+  background: var(--line);
+}
+
+.stat-value {
+  font-family: 'Fira Code', monospace;
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--amber);
+  line-height: 1.1;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: var(--mut);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+/* Center Clock & Coffee Greeting */
+.dashboard-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 36px;
+}
+
+.dashboard-time {
+  font-family: 'Playfair Display', serif;
+  font-size: 72px;
+  font-weight: 700;
+  color: var(--crema);
+  letter-spacing: -1px;
+  line-height: 1;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
+  margin-bottom: 8px;
+}
+
+.dashboard-greeting {
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--t2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dashboard-quote {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 13.5px;
+  color: var(--mut);
+  margin-top: 8px;
+  max-width: 500px;
+}
+
+/* Center Quick Search / Bar */
+.dashboard-search-bar {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 620px;
+  height: 48px;
+  background: var(--term);
+  border: 1px solid var(--line-strong);
+  border-radius: 28px;
+  padding: 0 16px;
+  gap: 12px;
+  box-shadow: var(--shadow-md);
+  margin-bottom: 40px;
+  transition: all var(--transition-normal);
+}
+
+.dashboard-search-bar:focus-within {
+  border-color: var(--caramel);
+  box-shadow: 0 0 20px var(--caramel-glow);
+  transform: translateY(-2px);
+}
+
+.dashboard-search-icon {
+  color: var(--caramel);
+  font-size: 18px;
+}
+
+.dashboard-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  color: var(--crema);
+}
+
+.dashboard-search-input::placeholder {
+  color: var(--mut);
+}
+
+/* Speed Dials / Shortcuts Grid */
+.speed-dials-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(105px, 1fr));
+  gap: 16px;
+  max-width: 860px;
+  width: 100%;
+  margin-bottom: 40px;
+}
+
+.speed-dial-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 8px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  text-decoration: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.speed-dial-card:hover {
+  background: var(--elev);
+  border-color: var(--caramel);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.5), 0 0 12px var(--caramel-glow);
+}
+
+.speed-dial-icon-wrap {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--term);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: var(--crema);
+  transition: all var(--transition-fast);
+}
+
+.speed-dial-card:hover .speed-dial-icon-wrap {
+  background: var(--elev);
+  border-color: var(--caramel);
+  transform: scale(1.05);
+}
+
+.speed-dial-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--t2);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80px;
+}
+
+/* Dashboard Feature Cards (Rewards, News & Brew of the day) */
+.dashboard-cards-section {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+  max-width: 860px;
+  width: 100%;
+}
+
+.feature-widget-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
+}
+
+.feature-widget-card:hover {
+  border-color: var(--line-strong);
+  background: var(--elev);
+}
+
+.widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.widget-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--caramel-light);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.widget-body {
+  font-size: 12.5px;
+  color: var(--t2);
+  line-height: 1.5;
+}
+
+/* Coffee Rewards Mini Widget */
+.rewards-balance-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Fira Code', monospace;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--amber);
+  background: var(--term);
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  width: fit-content;
+}

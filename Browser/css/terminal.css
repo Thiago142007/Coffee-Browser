@@ -1,0 +1,82 @@
+/* Terminal Mode & CLI Viewer Styles */
+
+.terminal-page-view {
+  min-height: 100%;
+  width: 100%;
+  background-color: var(--term);
+  color: var(--crema);
+  font-family: 'Fira Code', monospace;
+  padding: 24px;
+  line-height: 1.6;
+  font-size: 13px;
+  overflow-y: auto;
+  position: relative;
+}
+
+.term-banner {
+  color: var(--amber);
+  margin-bottom: 20px;
+  font-weight: bold;
+  white-space: pre;
+}
+
+.term-line {
+  margin-bottom: 4px;
+  word-break: break-word;
+}
+
+.term-line.prompt {
+  color: var(--caramel);
+}
+
+.term-line.output {
+  color: var(--t2);
+}
+
+.term-line.success {
+  color: var(--green);
+}
+
+.term-line.warn {
+  color: var(--amber);
+}
+
+.term-line.error {
+  color: var(--red);
+}
+
+.term-line.muted {
+  color: var(--mut);
+}
+
+.term-line.header {
+  color: var(--crema);
+  font-weight: 700;
+  border-bottom: 1px dashed var(--line);
+  padding-bottom: 4px;
+  margin-top: 14px;
+  margin-bottom: 8px;
+}
+
+.term-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.term-prompt-symbol {
+  color: var(--caramel);
+  font-weight: 700;
+  user-select: none;
+}
+
+.term-cli-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: 'Fira Code', monospace;
+  font-size: 13px;
+  color: var(--crema);
+}

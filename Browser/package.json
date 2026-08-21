@@ -1,0 +1,16 @@
+{
+  "name": "coffee-browser",
+  "version": "1.0.0",
+  "description": "Coffee Browser — Navegador Web Desktop com Privacidade Brave",
+  "main": "main.js",
+  "author": "Coffee Browser Team",
+  "scripts": {
+    "start": "electron .",
+    "installer": "electron ../Installer",
+    "build:exe": "npx electron-packager . CoffeeBrowser --platform=win32 --arch=x64 --out=dist --overwrite"
+  },
+  "devDependencies": {
+    "@electron/packager": "^19.0.2",
+    "electron": "^34.3.0"
+  }
+}

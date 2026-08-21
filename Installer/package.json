@@ -1,0 +1,10 @@
+{
+  "name": "coffee-browser-installer",
+  "version": "1.0.0",
+  "description": "Instalador Customizado Oficial do Coffee Browser",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:exe": "npx electron-packager . CoffeeBrowserSetup --platform=win32 --arch=x64 --out=dist --overwrite"
+  }
+}

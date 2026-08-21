@@ -1,0 +1,282 @@
+/* Coffee Browser Global Theme & Styling */
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,600&display=swap');
+
+:root, [data-roast="medio"] {
+  --bg: #120A06;
+  --bg-subtle: #170E09;
+  --card: #1E120B;
+  --card-hover: #26170E;
+  --elev: #2C1A12;
+  --elev-hover: #362016;
+  --term: #0D0704;
+  --line: #3D2418;
+  --line-strong: #543322;
+  --crema: #FDF6E2;
+  --crema-muted: #E2D3BE;
+  --t2: #D4C3B3;
+  --mut: #9C8273;
+  --caramel: #D97706;
+  --caramel-glow: rgba(217, 119, 6, 0.25);
+  --caramel-light: #F59E0B;
+  --amber: #F59E0B;
+  --green: #22C55E;
+  --green-glow: rgba(34, 197, 94, 0.2);
+  --red: #EF4444;
+  --red-glow: rgba(239, 68, 68, 0.2);
+  --purple: #A855F7;
+  --shield-active: #F59E0B;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.7);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-smooth: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-roast="claro"] {
+  --bg: #2E1B10;
+  --bg-subtle: #3A2315;
+  --card: #442A19;
+  --card-hover: #4F311E;
+  --elev: #593721;
+  --elev-hover: #663F26;
+  --term: #22140B;
+  --line: #613C24;
+  --line-strong: #784B2D;
+  --crema: #FFF9EC;
+  --crema-muted: #EBDAC6;
+  --t2: #EBDAC6;
+  --mut: #C4A684;
+  --caramel: #F59E0B;
+  --caramel-glow: rgba(245, 158, 11, 0.25);
+  --caramel-light: #FBBF24;
+  --amber: #FBBF24;
+  --green: #34D399;
+  --green-glow: rgba(52, 211, 153, 0.25);
+  --red: #F87171;
+  --red-glow: rgba(248, 113, 113, 0.25);
+}
+
+[data-roast="escuro"] {
+  --bg: #0A0503;
+  --bg-subtle: #0E0704;
+  --card: #140B06;
+  --card-hover: #1A0F08;
+  --elev: #1E110A;
+  --elev-hover: #26160D;
+  --term: #050201;
+  --line: #29170E;
+  --line-strong: #3D2215;
+  --crema: #FDF6E2;
+  --crema-muted: #D4C3B3;
+  --t2: #C9B6A4;
+  --mut: #8A7263;
+  --caramel: #D97706;
+  --caramel-glow: rgba(217, 119, 6, 0.2);
+  --caramel-light: #EA580C;
+  --amber: #D97706;
+  --green: #10B981;
+  --green-glow: rgba(16, 185, 129, 0.2);
+  --red: #DC2626;
+  --red-glow: rgba(220, 38, 38, 0.2);
+}
+
+/* Modo Torra Oculta (Privado / Incognito) */
+[data-roast="oculto"] {
+  --bg: #0B070E;
+  --bg-subtle: #110B16;
+  --card: #180F20;
+  --card-hover: #20142A;
+  --elev: #281A34;
+  --elev-hover: #322142;
+  --term: #060408;
+  --line: #3D2550;
+  --line-strong: #54336E;
+  --crema: #F8F4FF;
+  --crema-muted: #DACEE8;
+  --t2: #D1BFE8;
+  --mut: #9B88B4;
+  --caramel: #A855F7;
+  --caramel-glow: rgba(168, 85, 247, 0.3);
+  --caramel-light: #C084FC;
+  --amber: #C084FC;
+  --green: #34D399;
+  --green-glow: rgba(52, 211, 153, 0.25);
+  --red: #F43F5E;
+  --red-glow: rgba(244, 63, 94, 0.25);
+  --shield-active: #A855F7;
+}
+
+/* Brave-Style Settings Sidebar Item */
+.settings-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  color: var(--t2);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.settings-nav-item:hover {
+  background: var(--elev);
+  color: var(--crema);
+}
+
+.settings-nav-item.active {
+  background: var(--elev);
+  color: var(--caramel-light);
+  font-weight: 600;
+  border-left: 3px solid var(--caramel);
+}
+
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--bg);
+  color: var(--crema);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+  transition: background-color 0.4s ease, color 0.4s ease;
+}
+
+.font-mono {
+  font-family: 'Fira Code', monospace;
+}
+
+.font-display {
+  font-family: 'Inter', sans-serif;
+}
+
+.font-serif {
+  font-family: 'Playfair Display', Georgia, serif;
+}
+
+/* Textura Grain Vintage */
+.grain {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  opacity: 0.032;
+  background-image: radial-gradient(#fff 1px, transparent 0);
+  background-size: 24px 24px;
+  z-index: 0;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--term);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--line-strong);
+}
+
+/* Glow & Borders Utilities */
+.border-coffee {
+  border-color: var(--line);
+}
+.border-caramel {
+  border-color: var(--caramel);
+}
+.glow-caramel {
+  box-shadow: 0 0 15px var(--caramel-glow);
+}
+.glow-green {
+  box-shadow: 0 0 12px var(--green-glow);
+}
+
+/* Micro-Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleUp {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+@keyframes coffeeSteam {
+  0% { transform: translateY(0) scaleX(1); opacity: 0; }
+  20% { opacity: 0.6; }
+  50% { transform: translateY(-12px) scaleX(1.2) rotate(3deg); opacity: 0.4; }
+  100% { transform: translateY(-24px) scaleX(1.4) rotate(-3deg); opacity: 0; }
+}
+
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-scale-up {
+  animation: scaleUp 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-steam {
+  animation: coffeeSteam 3s ease-in-out infinite;
+}
+
+.animate-spin-slow {
+  animation: spinSlow 12s linear infinite;
+}
+
+/* Cursor Terminal Blink */
+.cursor-blink {
+  animation: blink 1s step-start infinite;
+}
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+/* Coffee Steam Decorative Canvas / Element */
+.steam-particle {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--crema);
+  filter: blur(2px);
+  pointer-events: none;
+}

@@ -1,0 +1,16 @@
+# Node & Electron dependencies
+node_modules/
+Browser/node_modules/
+Installer/node_modules/
+
+# Build output directories & large binaries (>100MB limit on GitHub)
+Browser/dist/
+Installer/dist/
+Installer/payload.zip
+*.exe
+CoffeeBrowser-Setup.exe
+
+# OS & Temp files
+.DS_Store
+Thumbs.db
+*.log

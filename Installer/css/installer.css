@@ -1,0 +1,786 @@
+/* ========================================================
+   Coffee Browser Custom Installer Stylesheet
+   Dark Roast Aesthetic, Warm Caramel Glows & Terminal Elements
+======================================================== */
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap');
+
+:root {
+  --bg: #120A06;
+  --bg-subtle: #170E09;
+  --card: #1E120B;
+  --card-hover: #27170E;
+  --elev: #2C1A12;
+  --elev-hover: #382117;
+  --term: #0D0704;
+  --line: #3D2418;
+  --line-strong: #5A3522;
+  --crema: #FDF6E2;
+  --crema-muted: #E2D3BE;
+  --t2: #D4C3B3;
+  --mut: #9C8273;
+  --caramel: #D97706;
+  --caramel-glow: rgba(217, 119, 6, 0.3);
+  --caramel-light: #F59E0B;
+  --amber: #F59E0B;
+  --green: #22C55E;
+  --green-glow: rgba(34, 197, 94, 0.25);
+  --red: #EF4444;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --shadow-main: 0 20px 50px rgba(0, 0, 0, 0.85);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: transparent;
+  color: var(--crema);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+/* Background Window Wrapper with Rounded Border & Glow */
+.installer-window {
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-main), 0 0 25px rgba(217, 119, 6, 0.12);
+  overflow: hidden;
+  position: relative;
+}
+
+/* Vintage Grain Texture */
+.grain-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: radial-gradient(#fff 1px, transparent 0);
+  background-size: 20px 20px;
+  z-index: 1;
+}
+
+/* ========================================================
+   1. Titlebar (Custom Frameless Window Controls)
+======================================================== */
+.installer-titlebar {
+  height: 42px;
+  background: var(--term);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  -webkit-app-region: drag;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.titlebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.titlebar-logo {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+}
+
+.titlebar-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: var(--crema);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.titlebar-badge {
+  font-family: 'Fira Code', monospace;
+  font-size: 10px;
+  background: var(--elev);
+  color: var(--caramel-light);
+  padding: 2px 7px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  font-weight: 600;
+}
+
+.titlebar-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  -webkit-app-region: no-drag;
+}
+
+.win-control-btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--mut);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.win-control-btn:hover {
+  background: var(--elev);
+  color: var(--crema);
+  border-color: var(--line);
+}
+
+.win-control-btn.close-btn:hover {
+  background: var(--red);
+  color: #fff;
+  border-color: var(--red);
+}
+
+/* ========================================================
+   2. Step Indicator Navigation Bar
+======================================================== */
+.installer-steps-bar {
+  height: 48px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 20px;
+  z-index: 5;
+  flex-shrink: 0;
+}
+
+.step-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mut);
+  transition: all var(--transition-fast);
+}
+
+.step-number {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--term);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Fira Code', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mut);
+  transition: all var(--transition-fast);
+}
+
+.step-indicator.active {
+  color: var(--caramel-light);
+  font-weight: 700;
+}
+
+.step-indicator.active .step-number {
+  background: var(--caramel);
+  color: #fff;
+  border-color: var(--caramel-light);
+  box-shadow: 0 0 10px var(--caramel-glow);
+}
+
+.step-indicator.completed {
+  color: var(--t2);
+}
+
+.step-indicator.completed .step-number {
+  background: var(--green);
+  color: #0A0A0A;
+  border-color: var(--green);
+}
+
+/* ========================================================
+   3. Main Body / Wizard Steps Container
+======================================================== */
+.installer-body {
+  flex: 1;
+  position: relative;
+  overflow-y: auto;
+  padding: 24px 32px;
+  z-index: 2;
+}
+
+.wizard-step {
+  display: none;
+  flex-direction: column;
+  height: 100%;
+  animation: stepFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.wizard-step.active {
+  display: flex;
+}
+
+@keyframes stepFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ========================================================
+   Step 1: Welcome Screen
+======================================================== */
+.welcome-hero {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 18px 22px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.welcome-hero::before {
+  content: '';
+  position: absolute;
+  top: -50px;
+  right: -50px;
+  width: 140px;
+  height: 140px;
+  background: radial-gradient(circle, var(--caramel-glow) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.hero-logo-box {
+  position: relative;
+  width: 68px;
+  height: 68px;
+  flex-shrink: 0;
+}
+
+.hero-logo-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 14px;
+  object-fit: cover;
+  border: 2px solid var(--caramel);
+  box-shadow: 0 0 18px var(--caramel-glow);
+}
+
+.steam-anim {
+  position: absolute;
+  top: -12px;
+  right: 18px;
+  width: 8px;
+  height: 14px;
+  background: rgba(253, 246, 226, 0.4);
+  border-radius: 50%;
+  filter: blur(2px);
+  animation: steamRise 2.5s infinite ease-in-out;
+}
+
+@keyframes steamRise {
+  0% { transform: translateY(0) scaleX(1); opacity: 0; }
+  40% { opacity: 0.7; }
+  100% { transform: translateY(-20px) scaleX(1.4); opacity: 0; }
+}
+
+.hero-text h1 {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--crema);
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hero-text p {
+  font-size: 13px;
+  color: var(--t2);
+  line-height: 1.45;
+}
+
+/* Feature Highlights Grid */
+.features-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: auto;
+}
+
+.feature-pill-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.feature-pill-card:hover {
+  background: var(--elev);
+  border-color: var(--line-strong);
+  transform: translateY(-2px);
+}
+
+.feature-icon-box {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--term);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--caramel-light);
+  flex-shrink: 0;
+}
+
+.feature-info h4 {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--crema);
+  margin-bottom: 2px;
+}
+
+.feature-info p {
+  font-size: 11.5px;
+  color: var(--mut);
+  line-height: 1.35;
+}
+
+/* ========================================================
+   Step 2: Customization & Directory Options
+======================================================== */
+.step-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--crema);
+  margin-bottom: 4px;
+}
+
+.step-subtitle {
+  font-size: 12.5px;
+  color: var(--mut);
+  margin-bottom: 16px;
+}
+
+.section-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Roast Selector Cards */
+.roast-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.roast-card {
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.roast-card:hover {
+  background: var(--elev);
+  border-color: var(--line-strong);
+}
+
+.roast-card.selected {
+  border-color: var(--caramel);
+  background: var(--elev);
+  box-shadow: 0 0 12px var(--caramel-glow);
+}
+
+.roast-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.roast-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--crema);
+}
+
+.roast-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.roast-dot.claro { background: #F59E0B; }
+.roast-dot.medio { background: #D97706; }
+.roast-dot.escuro { background: #543322; }
+
+.roast-desc {
+  font-size: 11px;
+  color: var(--mut);
+  line-height: 1.3;
+}
+
+/* Installation Path Row */
+.install-path-group {
+  margin-bottom: 16px;
+}
+
+.path-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.path-input {
+  flex: 1;
+  background: var(--term);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-family: 'Fira Code', monospace;
+  font-size: 12px;
+  color: var(--crema);
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.path-input:focus {
+  border-color: var(--caramel);
+}
+
+.browse-btn {
+  background: var(--elev);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--crema);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0 14px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.browse-btn:hover {
+  background: var(--elev-hover);
+  border-color: var(--line-strong);
+}
+
+/* Checkbox Options */
+.options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.custom-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--t2);
+  cursor: pointer;
+}
+
+.custom-checkbox-row input {
+  accent-color: var(--caramel);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+/* ========================================================
+   Step 3: Real-Time Installing & Terminal Log
+======================================================== */
+.installing-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.installing-status-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--crema);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.installing-percentage {
+  font-family: 'Fira Code', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--caramel-light);
+}
+
+/* Custom Glowing Progress Bar */
+.progress-bar-track {
+  width: 100%;
+  height: 10px;
+  background: var(--term);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  overflow: hidden;
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--caramel) 0%, var(--caramel-light) 100%);
+  border-radius: 4px;
+  box-shadow: 0 0 12px var(--caramel-glow);
+  transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Terminal Installation Stream */
+.terminal-stream-card {
+  flex: 1;
+  background: var(--term);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 180px;
+}
+
+.terminal-stream-header {
+  height: 28px;
+  background: #080402;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  font-family: 'Fira Code', monospace;
+  font-size: 10.5px;
+  color: var(--mut);
+}
+
+.terminal-stream-logs {
+  flex: 1;
+  padding: 10px 12px;
+  font-family: 'Fira Code', monospace;
+  font-size: 11px;
+  color: var(--t2);
+  line-height: 1.5;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.log-entry {
+  display: flex;
+  gap: 8px;
+}
+
+.log-entry.info { color: var(--t2); }
+.log-entry.ok { color: var(--green); font-weight: 600; }
+.log-entry.warn { color: var(--caramel-light); }
+
+/* ========================================================
+   Step 4: Success / Finished Screen
+======================================================== */
+.finished-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 24px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  margin-bottom: auto;
+}
+
+.finished-icon-badge {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--term);
+  border: 2px solid var(--green);
+  box-shadow: 0 0 20px var(--green-glow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--green);
+  margin-bottom: 16px;
+  animation: pulseGlow 3s infinite ease-in-out;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 15px var(--green-glow); }
+  50% { transform: scale(1.05); box-shadow: 0 0 25px rgba(34, 197, 94, 0.4); }
+}
+
+.finished-card h2 {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--crema);
+  margin-bottom: 6px;
+}
+
+.finished-card p {
+  font-size: 13px;
+  color: var(--t2);
+  max-width: 480px;
+  line-height: 1.45;
+  margin-bottom: 20px;
+}
+
+.finished-summary-box {
+  width: 100%;
+  max-width: 480px;
+  background: var(--term);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  text-align: left;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.summary-label { color: var(--mut); }
+.summary-val { color: var(--crema); font-weight: 600; font-family: 'Fira Code', monospace; }
+
+/* ========================================================
+   4. Footer Action Buttons Bar
+======================================================== */
+.installer-footer {
+  height: 56px;
+  background: var(--term);
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.footer-left {
+  display: flex;
+  align-items: center;
+}
+
+.footer-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: 1px solid transparent;
+}
+
+.btn-secondary {
+  background: var(--card);
+  border-color: var(--line);
+  color: var(--t2);
+}
+
+.btn-secondary:hover {
+  background: var(--elev);
+  border-color: var(--line-strong);
+  color: var(--crema);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--caramel) 0%, #B45309 100%);
+  color: #FFF9EC;
+  border-color: var(--caramel-light);
+  box-shadow: 0 2px 10px var(--caramel-glow);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--caramel-light) 0%, var(--caramel) 100%);
+  box-shadow: 0 4px 16px var(--caramel-glow);
+  transform: translateY(-1px);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, var(--green) 0%, #15803D 100%);
+  color: #0A0A0A;
+  font-weight: 700;
+  border-color: #86EFAC;
+  box-shadow: 0 2px 10px var(--green-glow);
+}
+
+.btn-success:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}

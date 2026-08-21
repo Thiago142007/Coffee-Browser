@@ -1,0 +1,426 @@
+const { app, BrowserWindow, session, ipcMain, nativeTheme, nativeImage, shell } = require('electron');
+const path = require('path');
+const fs = require('fs');
+
+// Set Windows App User Model ID so the custom logo appears on the Windows Taskbar & Alt+Tab
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.coffeebrowser.app');
+}
+
+// Enforce Dark Mode by default across all Chromium web contents & engine
+nativeTheme.themeSource = 'dark';
+app.commandLine.appendSwitch('force-dark-mode');
+app.commandLine.appendSwitch('enable-features', 'WebContentsForceDark:choice/reversal_and_color_inversion,DnsOverHttps');
+app.commandLine.appendSwitch('blink-settings', 'forceDarkModeEnabled=true');
+
+// Enforce Cloudflare DNS over HTTPS (1.1.1.1 / DoH) across all Chromium web requests & searches
+app.commandLine.appendSwitch('dns-over-https-templates', 'https://cloudflare-dns.com/dns-query{?dns}');
+app.commandLine.appendSwitch('dns-over-https-mode', 'secure');
+
+let mainWindow;
+let isAdblockPausedGlobal = false;
+let adblockSiteWhitelist = {};
+
+// Listen to Coador state updates from renderer
+ipcMain.on('update-coador-state', (event, data) => {
+  if (data) {
+    if (typeof data.isPausedGlobal === 'boolean') isAdblockPausedGlobal = data.isPausedGlobal;
+    if (data.siteWhitelist) adblockSiteWhitelist = data.siteWhitelist;
+  }
+});
+
+function createWindow() {
+  // Coador — Brave-style Native Ad & Tracker Blocker Engine
+  const adBlockFilter = {
+    urls: [
+      '*://*.doubleclick.net/*',
+      '*://*.googleadservices.com/*',
+      '*://*.googlesyndication.com/*',
+      '*://*.adnxs.com/*',
+      '*://*.ads.pubmatic.com/*',
+      '*://*.criteo.com/*',
+      '*://*.criteo.net/*',
+      '*://*.taboola.com/*',
+      '*://*.outbrain.com/*',
+      '*://*.amazon-adsystem.com/*',
+      '*://*.rubiconproject.com/*',
+      '*://*.openx.net/*',
+      '*://*.popads.net/*',
+      '*://*.popcash.net/*',
+      '*://*.propellerads.com/*',
+      '*://*.adcolony.com/*',
+      '*://*.adroll.com/*',
+      '*://*.smartadserver.com/*',
+      '*://*.mgid.com/*',
+      '*://*.revcontent.com/*',
+      '*://*.trafficfactory.biz/*',
+      '*://*.zergnet.com/*',
+      '*://*.adsterra.com/*',
+      '*://*.scorecardresearch.com/*',
+      '*://*.hotjar.com/*',
+      '*://*.clarity.ms/*',
+      '*://*.analytics.twitter.com/*',
+      '*://*.google-analytics.com/*',
+      '*://*.facebook.com/tr/*',
+      '*://*.connect.facebook.net/*/fbevents.js*',
+      '*://*.monetag.com/*',
+      '*://*.clickadu.com/*',
+      '*://*.exoclick.com/*',
+      '*://*.juicyads.com/*',
+      '*://*.hilltopads.com/*',
+      '*://*.mc.yandex.ru/*',
+      '*://*.mixpanel.com/*',
+      '*://*.segment.io/*',
+      '*://*.heapanalytics.com/*',
+      '*://*.intercom.io/widget/*',
+      '*://*.clicky.com/*',
+      '*://*.mouseflow.com/*',
+      '*://*.matomo.org/*',
+      '*://*.piwik.pro/*'
+    ]
+  };
+
+  session.defaultSession.webRequest.onBeforeRequest(adBlockFilter, (details, callback) => {
+    // If Coador is paused globally or on this specific site, do not block request
+    if (isAdblockPausedGlobal) {
+      callback({ cancel: false });
+      return;
+    }
+
+    try {
+      if (details.initiator) {
+        const initHost = new URL(details.initiator).hostname;
+        const cleanHost = initHost.replace(/^www\./, '');
+        if (adblockSiteWhitelist[initHost] || adblockSiteWhitelist[cleanHost]) {
+          callback({ cancel: false });
+          return;
+        }
+      }
+    } catch(e) {}
+
+    try {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('coador-blocked-ad', { url: details.url });
+      }
+    } catch(e) {}
+    callback({ cancel: true });
+  });
+
+  // Intercept headers globally so any site can be loaded in webview without CSP or frame block
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const responseHeaders = Object.assign({}, details.responseHeaders);
+    delete responseHeaders['x-frame-options'];
+    delete responseHeaders['X-Frame-Options'];
+    delete responseHeaders['content-security-policy'];
+    delete responseHeaders['Content-Security-Policy'];
+    delete responseHeaders['frame-options'];
+    callback({ cancel: false, responseHeaders });
+  });
+
+  const appIcoPath = path.join(__dirname, 'assets', 'logo.ico');
+  const appPngPath = path.join(__dirname, 'assets', 'logo.png');
+  const appJpgPath = path.join(__dirname, 'assets', 'logo.jpg');
+  
+  let iconPath = appJpgPath;
+  if (fs.existsSync(appIcoPath)) iconPath = appIcoPath;
+  else if (fs.existsSync(appPngPath)) iconPath = appPngPath;
+
+  const appIcon = nativeImage.createFromPath(iconPath);
+
+  mainWindow = new BrowserWindow({
+    width: 1360,
+    height: 860,
+    minWidth: 800,
+    minHeight: 600,
+    backgroundColor: '#120A06',
+    title: 'Coffee Browser',
+    icon: appIcon,
+    frame: false, // 100% Frameless custom window
+    titleBarStyle: 'hidden',
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+      webviewTag: true, // Enables <webview> tags for full Chromium embedded instances per tab
+      webSecurity: false,
+      allowRunningInsecureContent: true
+    }
+  });
+
+  if (appIcon && !appIcon.isEmpty()) {
+    mainWindow.setIcon(appIcon);
+  }
+
+  // Prevent top-level window from ever navigating away from index.html
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (!url.startsWith('file://')) {
+      event.preventDefault();
+      mainWindow.webContents.executeJavaScript(`
+        if (window.CoffeeTabs) {
+          window.CoffeeTabs.navigateActiveTab(${JSON.stringify(url)});
+        }
+      `);
+    }
+  });
+
+  // Prevent target="_blank" from breaking out of the window - open in new tab
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    mainWindow.webContents.executeJavaScript(`
+      if (window.CoffeeTabs) {
+        window.CoffeeTabs.createTab(${JSON.stringify(url)});
+      }
+    `);
+    return { action: 'deny' };
+  });
+
+  // Intercept all child webviews / windows and open as new browser tabs
+  app.on('web-contents-created', (event, contents) => {
+    contents.setWindowOpenHandler(({ url }) => {
+      if (mainWindow && !mainWindow.isDestroyed() && url && url !== 'about:blank') {
+        mainWindow.webContents.executeJavaScript(`
+          if (window.CoffeeTabs) {
+            window.CoffeeTabs.createTab(${JSON.stringify(url)});
+          }
+        `);
+      }
+      return { action: 'deny' };
+    });
+  });
+
+  // Windows Hardware & Mouse Extra Buttons Navigation (Mouse 4 & 5 / App Commands)
+  mainWindow.on('app-command', (e, cmd) => {
+    if (cmd === 'browser-backward') {
+      mainWindow.webContents.executeJavaScript(`if (window.CoffeeOmnibox) window.CoffeeOmnibox.goBack();`);
+    } else if (cmd === 'browser-forward') {
+      mainWindow.webContents.executeJavaScript(`if (window.CoffeeOmnibox) window.CoffeeOmnibox.goForward();`);
+    }
+  });
+
+  mainWindow.loadFile(path.join(__dirname, 'index.html'));
+
+  mainWindow.on('closed', function () {
+    mainWindow = null;
+  });
+}
+
+// Native Window Controls IPC
+ipcMain.on('window-minimize', () => {
+  if (mainWindow) mainWindow.minimize();
+});
+
+ipcMain.on('window-maximize', () => {
+  if (mainWindow) {
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+  }
+});
+
+ipcMain.on('window-close', () => {
+  if (mainWindow) mainWindow.close();
+});
+
+// Telemetry: Real System RAM calculation across active non-Efficiency Mode processes
+ipcMain.handle('get-system-memory', async () => {
+  try {
+    let totalKB = 0;
+    if (app && typeof app.getAppMetrics === 'function') {
+      const metrics = app.getAppMetrics();
+      for (const m of metrics) {
+        // Exclude processes running in Efficiency Mode (Windows EcoQoS / throttled background processes)
+        if (m.efficiencyMode === true) {
+          continue;
+        }
+        if (m.memory && typeof m.memory.workingSetSize === 'number') {
+          totalKB += m.memory.workingSetSize;
+        }
+      }
+    }
+    // Fallback if no non-efficiency metrics found
+    if (totalKB === 0 && process.memoryUsage) {
+      totalKB = Math.round(process.memoryUsage().rss / 1024);
+    }
+    return { workingSetKB: totalKB };
+  } catch (err) {
+    let rss = 0;
+    if (process.memoryUsage) {
+      rss = Math.round(process.memoryUsage().rss / 1024);
+    }
+    return { workingSetKB: rss };
+  }
+});
+
+// ==========================================
+// Integrated Download Manager Backend
+// ==========================================
+let downloadsStore = [];
+const activeDownloadItems = new Map();
+
+function getDownloadsHistoryPath() {
+  return path.join(app.getPath('userData'), 'downloads_history.json');
+}
+
+function loadDownloadsHistory() {
+  try {
+    const p = getDownloadsHistoryPath();
+    if (fs.existsSync(p)) {
+      downloadsStore = JSON.parse(fs.readFileSync(p, 'utf8')) || [];
+    }
+  } catch(e) {
+    downloadsStore = [];
+  }
+}
+
+function saveDownloadsHistory() {
+  try {
+    const p = getDownloadsHistoryPath();
+    fs.writeFileSync(p, JSON.stringify(downloadsStore.slice(0, 100), null, 2));
+  } catch(e) {}
+}
+
+function setupDownloadManager() {
+  loadDownloadsHistory();
+
+  session.defaultSession.on('will-download', (event, item, webContents) => {
+    const id = 'dl_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+    activeDownloadItems.set(id, item);
+
+    const savePath = item.getSavePath() || path.join(app.getPath('downloads'), item.getFilename());
+    if (!item.getSavePath()) {
+      item.setSavePath(savePath);
+    }
+
+    const dlRecord = {
+      id,
+      filename: item.getFilename(),
+      savePath: item.getSavePath() || savePath,
+      url: item.getURL(),
+      receivedBytes: item.getReceivedBytes(),
+      totalBytes: item.getTotalBytes(),
+      speed: 0,
+      state: 'progressing',
+      isPaused: item.isPaused(),
+      startTime: Date.now(),
+      endTime: null,
+      fileDeleted: false
+    };
+
+    downloadsStore.unshift(dlRecord);
+    saveDownloadsHistory();
+
+    const notifyProgress = (stateName) => {
+      dlRecord.receivedBytes = item.getReceivedBytes();
+      dlRecord.totalBytes = item.getTotalBytes();
+      dlRecord.savePath = item.getSavePath() || dlRecord.savePath;
+      dlRecord.speed = typeof item.getCurrentBandwidth === 'function' ? item.getCurrentBandwidth() : 0;
+      dlRecord.isPaused = item.isPaused();
+      dlRecord.state = stateName || item.getState();
+
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('download-progress-update', dlRecord);
+      }
+    };
+
+    notifyProgress('progressing');
+
+    item.on('updated', (evt, state) => {
+      notifyProgress(state);
+    });
+
+    item.once('done', (evt, state) => {
+      activeDownloadItems.delete(id);
+      dlRecord.state = state;
+      dlRecord.endTime = Date.now();
+      dlRecord.receivedBytes = item.getReceivedBytes();
+      dlRecord.totalBytes = item.getTotalBytes();
+      dlRecord.speed = 0;
+
+      saveDownloadsHistory();
+
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('download-completed', dlRecord);
+      }
+    });
+  });
+}
+
+// Download IPC Handlers
+ipcMain.handle('get-downloads-list', async () => {
+  // Check file existence on disk for completed downloads
+  for (const item of downloadsStore) {
+    if (item.savePath) {
+      item.fileDeleted = !fs.existsSync(item.savePath);
+    }
+  }
+  return downloadsStore;
+});
+
+ipcMain.handle('pause-download', (event, id) => {
+  const item = activeDownloadItems.get(id);
+  if (item && !item.isPaused()) {
+    item.pause();
+    return true;
+  }
+  return false;
+});
+
+ipcMain.handle('resume-download', (event, id) => {
+  const item = activeDownloadItems.get(id);
+  if (item && item.isPaused()) {
+    item.resume();
+    return true;
+  }
+  return false;
+});
+
+ipcMain.handle('cancel-download', (event, id) => {
+  const item = activeDownloadItems.get(id);
+  if (item) {
+    item.cancel();
+    activeDownloadItems.delete(id);
+    return true;
+  }
+  return false;
+});
+
+ipcMain.handle('retry-download', (event, url) => {
+  if (mainWindow && url) {
+    mainWindow.webContents.downloadURL(url);
+    return true;
+  }
+  return false;
+});
+
+ipcMain.handle('open-download-file', async (event, savePath) => {
+  if (savePath && fs.existsSync(savePath)) {
+    try {
+      await shell.openPath(savePath);
+      return true;
+    } catch(e) {}
+  }
+  return false;
+});
+
+ipcMain.handle('open-download-folder', (event, savePath) => {
+  if (savePath) {
+    try {
+      shell.showItemInFolder(savePath);
+      return true;
+    } catch(e) {}
+  }
+  return false;
+});
+
+app.whenReady().then(() => {
+  setupDownloadManager();
+  createWindow();
+
+  app.on('activate', function () {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
+
+app.on('window-all-closed', function () {
+  if (process.platform !== 'darwin') app.quit();
+});
