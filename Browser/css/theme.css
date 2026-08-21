@@ -157,6 +157,16 @@ html, body {
   transition: background-color 0.4s ease, color 0.4s ease;
 }
 
+::selection {
+  background: var(--caramel);
+  color: #120A06;
+}
+
+input::selection, textarea::selection {
+  background: rgba(217, 119, 6, 0.45);
+  color: var(--crema);
+}
+
 .font-mono {
   font-family: 'Fira Code', monospace;
 }

@@ -1,5 +1,6 @@
 /**
- * Coffee Browser Intelligent Omnibox (Address & Real Search Bar)
+ * Coffee Browser Intelligent Omnibox & Smart Autocomplete Engine
+ * Real-time History, Bookmarks & Web Search Predictor
  */
 
 class CoffeeOmniboxManager {
@@ -19,7 +20,12 @@ class CoffeeOmniboxManager {
     this.selectedIndex = -1;
     this.debounceTimer = null;
     this.currentRequestId = 0;
-    this.bindEvents();
+    this.activeInput = this.input;
+
+    this.bindGlobalEvents();
+    if (this.input) {
+      this.attachSmartAutocomplete(this.input, false);
+    }
   }
 
   getInternalCommands() {
@@ -37,41 +43,256 @@ class CoffeeOmniboxManager {
     ];
   }
 
-  bindEvents() {
-    if (this.input) {
-      this.input.addEventListener('input', () => {
-        clearTimeout(this.debounceTimer);
-        this.debounceTimer = setTimeout(() => this.onInput(), 100);
-      });
+  /**
+   * Predict best link or domain based on History, Bookmarks, and System Pages
+   * @param {string} userTyped 
+   * @returns {{ fullText: string, originalUrl: string, title?: string, type: string } | null}
+   */
+  findBestMatch(userTyped) {
+    if (!userTyped || typeof userTyped !== 'string') return null;
+    const query = userTyped.trim().toLowerCase();
+    if (query.length === 0) return null;
 
-      this.input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          const items = this.dropdown ? this.dropdown.querySelectorAll('.dropdown-item') : [];
-          if (this.selectedIndex >= 0 && items[this.selectedIndex]) {
-            items[this.selectedIndex].click();
-          } else {
-            this.closeDropdown();
-            this.navigateFromInput(this.input.value);
-          }
-        } else if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          this.moveSelection(1);
-        } else if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          this.moveSelection(-1);
-        } else if (e.key === 'Escape') {
-          this.closeDropdown();
-          if (this.input) this.input.blur();
-        }
-      });
+    const candidates = [];
 
-      this.input.addEventListener('focus', () => {
-        this.input.select();
-        this.onInput();
-      });
+    // 1. Browsing History
+    const historyList = (window.BrowserState && window.BrowserState.history) || [];
+    for (const h of historyList) {
+      if (!h || !h.url) continue;
+      const url = h.url.trim();
+      if (url.startsWith('about:blank') || url === 'cafe://newtab' || url === '') continue;
+
+      let clean = url.replace(/^https?:\/\//i, '').replace(/^www\./i, '');
+      if (clean.endsWith('/')) clean = clean.slice(0, -1);
+
+      let domain = clean.split('/')[0];
+      const visits = h.visitCount || 1;
+      const score = visits * 15 + (h.time ? Math.min(20, Math.round((Date.now() - h.time) / 86400000)) : 0);
+
+      // Match domain prefix (e.g. "yo" -> "youtube.com")
+      if (domain.toLowerCase().startsWith(query)) {
+        candidates.push({
+          fullText: domain,
+          originalUrl: url.startsWith('http') ? `https://${domain}` : url,
+          title: h.title,
+          score: score + 120,
+          type: 'history-domain'
+        });
+      }
+
+      // Match full path (e.g. "github.com/th" -> "github.com/Thiago142007")
+      if (clean.toLowerCase().startsWith(query) && clean.toLowerCase() !== domain.toLowerCase()) {
+        candidates.push({
+          fullText: clean,
+          originalUrl: url,
+          title: h.title,
+          score: score + 90,
+          type: 'history-url'
+        });
+      }
+
+      // Match internal protocol (e.g. "cafe://set" -> "cafe://settings")
+      if (url.toLowerCase().startsWith(query)) {
+        candidates.push({
+          fullText: url,
+          originalUrl: url,
+          title: h.title,
+          score: score + 100,
+          type: 'internal'
+        });
+      }
     }
 
+    // 2. Bookmarks
+    const bookmarks = (window.BrowserState && window.BrowserState.bookmarks) || [];
+    for (const b of bookmarks) {
+      if (!b || !b.url) continue;
+      let clean = b.url.trim().replace(/^https?:\/\//i, '').replace(/^www\./i, '');
+      if (clean.endsWith('/')) clean = clean.slice(0, -1);
+      let domain = clean.split('/')[0];
+
+      if (domain.toLowerCase().startsWith(query)) {
+        candidates.push({
+          fullText: domain,
+          originalUrl: b.url,
+          title: b.title,
+          score: 110,
+          type: 'bookmark'
+        });
+      } else if (clean.toLowerCase().startsWith(query)) {
+        candidates.push({
+          fullText: clean,
+          originalUrl: b.url,
+          title: b.title,
+          score: 85,
+          type: 'bookmark'
+        });
+      }
+    }
+
+    // 3. System Pages
+    const internalCommands = this.getInternalCommands();
+    for (const cmd of internalCommands) {
+      if (cmd.text.toLowerCase().startsWith(query)) {
+        candidates.push({
+          fullText: cmd.text,
+          originalUrl: cmd.text,
+          title: cmd.desc,
+          score: 115,
+          type: 'system'
+        });
+      }
+    }
+
+    // 4. Common top websites fallback (for instant out-of-the-box convenience)
+    const commonDomains = [
+      'google.com', 'youtube.com', 'github.com', 'wikipedia.org', 'reddit.com',
+      'twitter.com', 'instagram.com', 'facebook.com', 'discord.com', 'netflix.com',
+      'amazon.com', 'linkedin.com', 'whatsapp.com', 'twitch.tv', 'spotify.com',
+      'globo.com', 'uol.com.br', 'g1.globo.com'
+    ];
+    for (const d of commonDomains) {
+      if (d.startsWith(query)) {
+        candidates.push({
+          fullText: d,
+          originalUrl: `https://${d}`,
+          title: d,
+          score: 30,
+          type: 'common'
+        });
+      }
+    }
+
+    if (candidates.length === 0) return null;
+
+    // Sort by highest score first
+    candidates.sort((a, b) => b.score - a.score);
+    return candidates[0];
+  }
+
+  /**
+   * Attach smart history guessing, inline completion, and key navigation to any input
+   * @param {HTMLInputElement} inputEl 
+   * @param {boolean} isNewTab 
+   */
+  attachSmartAutocomplete(inputEl, isNewTab = false) {
+    if (!inputEl || inputEl._hasSmartAutocomplete) return;
+    inputEl._hasSmartAutocomplete = true;
+    inputEl._isDeleting = false;
+    inputEl._userTypedPrefix = '';
+
+    inputEl.addEventListener('keydown', (e) => {
+      // Enter: Accept autocomplete and navigate/search immediately!
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const items = this.dropdown ? this.dropdown.querySelectorAll('.dropdown-item') : [];
+        if (this.selectedIndex >= 0 && items[this.selectedIndex]) {
+          items[this.selectedIndex].click();
+        } else {
+          this.closeDropdown();
+          this.navigateFromInput(inputEl.value);
+        }
+        return;
+      }
+
+      // Tab or ArrowRight: Accept the inline suggested completion
+      if (e.key === 'Tab' || e.key === 'ArrowRight') {
+        const start = inputEl.selectionStart;
+        const end = inputEl.selectionEnd;
+        const len = inputEl.value.length;
+
+        // If autocomplete text is currently selected at the end
+        if (start < end && end === len) {
+          e.preventDefault();
+          // Move cursor to the end and clear selection so user can continue typing
+          inputEl.setSelectionRange(len, len);
+          inputEl._userTypedPrefix = inputEl.value;
+          return;
+        }
+      }
+
+      // ArrowDown / ArrowUp: Dropdown navigation
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        this.moveSelection(1);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        this.moveSelection(-1);
+        return;
+      }
+
+      // Escape: Revert autocomplete and close dropdown
+      if (e.key === 'Escape') {
+        this.closeDropdown();
+        if (inputEl._userTypedPrefix && inputEl.value !== inputEl._userTypedPrefix) {
+          inputEl.value = inputEl._userTypedPrefix;
+        }
+        inputEl.blur();
+        return;
+      }
+
+      // Backspace / Delete: Mark deleting state so autocomplete doesn't immediately re-fill
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        inputEl._isDeleting = true;
+        // If selection exists at end, remove the selection and let backspace proceed cleanly
+        const start = inputEl.selectionStart;
+        const end = inputEl.selectionEnd;
+        if (start < end && end === inputEl.value.length) {
+          e.preventDefault();
+          inputEl.value = inputEl.value.slice(0, start);
+          inputEl._userTypedPrefix = inputEl.value;
+          this.onInput(inputEl);
+          return;
+        }
+      }
+    });
+
+    inputEl.addEventListener('input', (e) => {
+      clearTimeout(this.debounceTimer);
+
+      if (inputEl._isDeleting) {
+        inputEl._isDeleting = false;
+        inputEl._userTypedPrefix = inputEl.value;
+        this.debounceTimer = setTimeout(() => this.onInput(inputEl), 80);
+        return;
+      }
+
+      // Calculate what the user actually typed
+      let typed = inputEl.value;
+      if (inputEl.selectionStart !== null && inputEl.selectionStart < inputEl.selectionEnd) {
+        typed = inputEl.value.slice(0, inputEl.selectionStart);
+      }
+      inputEl._userTypedPrefix = typed;
+
+      // Smart Inline History Autocomplete
+      if (typed.trim().length > 0) {
+        const bestMatch = this.findBestMatch(typed);
+        if (bestMatch && bestMatch.fullText) {
+          const matchText = bestMatch.fullText;
+          if (matchText.toLowerCase().startsWith(typed.toLowerCase()) && matchText.length > typed.length) {
+            const remainder = matchText.slice(typed.length);
+            const fullVal = typed + remainder;
+            inputEl.value = fullVal;
+            inputEl.setSelectionRange(typed.length, fullVal.length);
+          }
+        }
+      }
+
+      this.debounceTimer = setTimeout(() => this.onInput(inputEl), 80);
+    });
+
+    inputEl.addEventListener('focus', () => {
+      this.activeInput = inputEl;
+      inputEl.select();
+      if (inputEl.value.trim()) {
+        this.onInput(inputEl);
+      }
+    });
+  }
+
+  bindGlobalEvents() {
     if (this.backBtn) {
       this.backBtn.addEventListener('click', () => this.goBack());
     }
@@ -97,19 +318,21 @@ class CoffeeOmniboxManager {
       }
     });
 
-    window.BrowserState.on('tabChanged', () => {
-      this.closeDropdown();
-      this.updateUI();
-    });
+    if (window.BrowserState) {
+      window.BrowserState.on('tabChanged', () => {
+        this.closeDropdown();
+        this.updateUI();
+      });
 
-    window.BrowserState.on('tabNavigated', () => {
-      this.closeDropdown();
-      this.updateUI();
-    });
+      window.BrowserState.on('tabNavigated', () => {
+        this.closeDropdown();
+        this.updateUI();
+      });
 
-    window.BrowserState.on('zoomChanged', () => {
-      this.updateZoomUI();
-    });
+      window.BrowserState.on('zoomChanged', () => {
+        this.updateZoomUI();
+      });
+    }
   }
 
   moveSelection(delta) {
@@ -123,13 +346,19 @@ class CoffeeOmniboxManager {
     items[this.selectedIndex].scrollIntoView({ block: 'nearest' });
   }
 
-  async onInput() {
-    if (!this.input || document.activeElement !== this.input) {
+  async onInput(targetInput) {
+    const inputEl = targetInput || this.activeInput || this.input;
+    if (!inputEl || document.activeElement !== inputEl) {
       this.closeDropdown();
       return;
     }
 
-    const raw = this.input.value;
+    // Use user-typed prefix if selection exists
+    let raw = inputEl.value;
+    if (inputEl.selectionStart !== null && inputEl.selectionStart < inputEl.selectionEnd) {
+      raw = inputEl.value.slice(0, inputEl.selectionStart);
+    }
+
     const query = raw.trim().toLowerCase();
     if (!query) {
       this.closeDropdown();
@@ -140,7 +369,7 @@ class CoffeeOmniboxManager {
     this.selectedIndex = -1;
     let html = '';
 
-    // 1. Match History & Frequently Visited URLs
+    // 1. History & Frequently Visited
     const historyList = (window.BrowserState && window.BrowserState.history) || [];
     const historyMatches = historyList
       .filter(h => h.url.toLowerCase().includes(query) || (h.title && h.title.toLowerCase().includes(query)))
@@ -149,7 +378,7 @@ class CoffeeOmniboxManager {
 
     if (historyMatches.length > 0) {
       html += `
-        <div class="dropdown-section-title">Histórico & Frequentes</div>
+        <div class="dropdown-section-title">Histórico & Sugestões</div>
         ${historyMatches.map(h => `
           <div class="dropdown-item" onclick="window.CoffeeOmnibox.selectSuggestion('${h.url.replace(/'/g, "\\'")}')">
             <span class="icon" style="display:flex; color:var(--amber);">${window.Icons.clock}</span>
@@ -181,10 +410,16 @@ class CoffeeOmniboxManager {
       `;
     }
 
-    const suggestions = await window.SearchEngine.fetchLiveSuggestions(raw);
+    // 3. Live Web Search Engine Suggestions
+    let suggestions = [];
+    if (window.SearchEngine && typeof window.SearchEngine.fetchLiveSuggestions === 'function') {
+      try {
+        suggestions = await window.SearchEngine.fetchLiveSuggestions(raw);
+      } catch(e) {}
+    }
 
-    // If a new input came in or user navigated / blurred, cancel this render!
-    if (reqId !== this.currentRequestId || document.activeElement !== this.input || !this.input.value.trim()) {
+    // Cancel render if a newer request came in
+    if (reqId !== this.currentRequestId || document.activeElement !== inputEl || !inputEl.value.trim()) {
       return;
     }
 
@@ -202,13 +437,15 @@ class CoffeeOmniboxManager {
       `).join('')}
     `;
 
-    this.dropdown.innerHTML = html;
-    this.dropdown.style.display = 'block';
-    this.dropdown.classList.add('open');
+    if (this.dropdown) {
+      this.dropdown.innerHTML = html;
+      this.dropdown.style.display = 'block';
+      this.dropdown.classList.add('open');
+    }
   }
 
   selectSuggestion(url) {
-    this.input.value = url;
+    if (this.input) this.input.value = url;
     this.closeDropdown();
     this.navigateFromInput(url);
   }
@@ -341,6 +578,7 @@ class CoffeeOmniboxManager {
 
     if (this.input) {
       this.input.value = tab.url;
+      this.input._userTypedPrefix = tab.url;
     }
 
     if (this.securityBadge) {

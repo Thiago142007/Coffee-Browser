@@ -1,4 +1,4 @@
-const { app, BrowserWindow, session, ipcMain, nativeTheme, nativeImage, shell } = require('electron');
+const { app, BrowserWindow, session, ipcMain, nativeTheme, nativeImage, shell, desktopCapturer } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -583,7 +583,118 @@ ipcMain.handle('open-download-folder', (event, savePath) => {
   return false;
 });
 
+// ==========================================
+// Screen Sharing & Media Permissions Backend
+// ==========================================
+const pendingScreenShareRequests = new Map();
+
+function setupMediaAndPermissions() {
+  // Allow camera, microphone, screen capture, notifications, etc.
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
+    callback(true);
+  });
+
+  session.defaultSession.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
+    return true;
+  });
+
+  // Handle getDisplayMedia (Screen Sharing) for all tabs & webviews
+  session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
+    try {
+      const sources = await desktopCapturer.getSources({
+        types: ['screen', 'window'],
+        thumbnailSize: { width: 500, height: 300 },
+        fetchWindowIcons: true
+      });
+
+      if (!sources || sources.length === 0) {
+        callback({});
+        return;
+      }
+
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        callback({ video: sources[0], audio: request.audioRequested ? 'loopback' : null });
+        return;
+      }
+
+      const requestId = 'screen_req_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+
+      const serializableSources = sources.map(s => ({
+        id: s.id,
+        name: s.name,
+        thumbnail: s.thumbnail ? s.thumbnail.toDataURL() : null,
+        appIcon: s.appIcon ? s.appIcon.toDataURL() : null,
+        isScreen: s.id.startsWith('screen:')
+      }));
+
+      // Set timeout in case user closes or ignores picker
+      const timeoutId = setTimeout(() => {
+        if (pendingScreenShareRequests.has(requestId)) {
+          const req = pendingScreenShareRequests.get(requestId);
+          pendingScreenShareRequests.delete(requestId);
+          req.callback({});
+        }
+      }, 90000);
+
+      pendingScreenShareRequests.set(requestId, {
+        callback,
+        sources,
+        request,
+        timeoutId
+      });
+
+      let requestingOrigin = request.securityOrigin || '';
+      if (!requestingOrigin && request.frame && request.frame.url) {
+        try {
+          requestingOrigin = new URL(request.frame.url).origin;
+        } catch(e) {
+          requestingOrigin = request.frame.url;
+        }
+      }
+
+      mainWindow.webContents.send('open-screen-share-picker', {
+        requestId,
+        sources: serializableSources,
+        origin: requestingOrigin,
+        audioRequested: !!request.audioRequested
+      });
+    } catch (err) {
+      console.error('[ScreenShare] Error in getDisplayMedia handler:', err);
+      callback({});
+    }
+  });
+
+  // Renderer screen share selection response
+  ipcMain.on('screen-share-choice', (event, data) => {
+    if (!data || !data.requestId) return;
+    const pending = pendingScreenShareRequests.get(data.requestId);
+    if (!pending) return;
+
+    clearTimeout(pending.timeoutId);
+    pendingScreenShareRequests.delete(data.requestId);
+
+    if (data.canceled || !data.sourceId) {
+      pending.callback({});
+      return;
+    }
+
+    const selectedSource = pending.sources.find(s => s.id === data.sourceId);
+    if (selectedSource) {
+      pending.callback({
+        video: selectedSource,
+        audio: data.audio ? 'loopback' : (pending.request.audioRequested ? 'loopback' : null)
+      });
+    } else {
+      pending.callback({
+        video: pending.sources[0],
+        audio: data.audio ? 'loopback' : null
+      });
+    }
+  });
+}
+
 app.whenReady().then(() => {
+  setupMediaAndPermissions();
   setupDownloadManager();
   createWindow();
 

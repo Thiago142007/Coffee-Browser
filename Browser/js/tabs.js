@@ -59,6 +59,7 @@ class CoffeeTabsManager {
     this.renderTabs();
     this.showActiveTab();
     this.saveSessionSnapshot();
+    this.focusSearchInput(id);
     window.BrowserState.emit('tabChanged', newTab);
 
     if (window.CoffeeOmnibox) {
@@ -179,12 +180,8 @@ class CoffeeTabsManager {
       view.innerHTML = window.CoffeePagesRenderer.render(currentUrl, tab);
       
       const ntInput = view.querySelector('#nt-search-input');
-      if (ntInput) {
-        ntInput.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') {
-            window.CoffeeOmnibox.navigateFromInput(ntInput.value);
-          }
-        });
+      if (ntInput && window.CoffeeOmnibox) {
+        window.CoffeeOmnibox.attachSmartAutocomplete(ntInput, true);
       }
       if (currentUrl.startsWith('cafe://terminal') && window.CoffeeTerminal) {
         window.CoffeeTerminal.initDOM();
@@ -233,12 +230,8 @@ class CoffeeTabsManager {
       view.innerHTML = window.CoffeePagesRenderer.render(url, tab);
       
       const ntInput = view.querySelector('#nt-search-input');
-      if (ntInput) {
-        ntInput.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') {
-            window.CoffeeOmnibox.navigateFromInput(ntInput.value);
-          }
-        });
+      if (ntInput && window.CoffeeOmnibox) {
+        window.CoffeeOmnibox.attachSmartAutocomplete(ntInput, true);
       }
       if (url.startsWith('cafe://terminal') && window.CoffeeTerminal) {
         window.CoffeeTerminal.initDOM();
@@ -610,6 +603,12 @@ class CoffeeTabsManager {
       }
     });
 
+    webview.addEventListener('permissionrequest', (e) => {
+      if (e.request && typeof e.request.allow === 'function') {
+        e.request.allow();
+      }
+    });
+
     webview.addEventListener('new-window', (e) => {
       e.preventDefault();
       if (e.url && e.url !== 'about:blank') {
@@ -648,6 +647,31 @@ class CoffeeTabsManager {
         window.CoffeeOmnibox.updateNavButtons(activeWebview);
       }
     }
+
+    if (tab.url.startsWith('cafe://newtab') || tab.url.startsWith('about:blank') || !tab.url) {
+      this.focusSearchInput(tab.id);
+    }
+  }
+
+  focusSearchInput(tabId) {
+    const targetId = tabId || (window.BrowserState && window.BrowserState.activeTabId);
+    setTimeout(() => {
+      if (targetId) {
+        const view = document.getElementById(`tab-view-${targetId}`);
+        if (view) {
+          const ntInput = view.querySelector('#nt-search-input');
+          if (ntInput) {
+            ntInput.focus();
+            ntInput.select();
+            return;
+          }
+        }
+      }
+      if (window.CoffeeOmnibox && window.CoffeeOmnibox.input) {
+        window.CoffeeOmnibox.input.focus();
+        window.CoffeeOmnibox.input.select();
+      }
+    }, 45);
   }
 
   setupZoomListener() {
