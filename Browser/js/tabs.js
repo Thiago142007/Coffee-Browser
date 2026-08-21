@@ -185,32 +185,19 @@ class CoffeeTabsManager {
     // Real Web Pages
     let target = this.normalizeNavigationUrl(currentUrl);
 
+    if (window.CoffeeBookmarks) {
+      window.CoffeeBookmarks.updateVisibility(target);
+    }
+
     view.innerHTML = `
-      <div class="webpage-live-wrapper" style="display:flex; flex-direction:column; width:100%; height:100%;">
-        <div class="web-bar" style="display:flex; align-items:center; justify-content:space-between; padding:4px 12px; background:var(--card); border-bottom:1px solid var(--line); font-size:11px; color:var(--t2); -webkit-app-region:no-drag;">
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span style="color:var(--green); display:flex; align-items:center;">${window.Icons.shieldCheck}</span>
-            <span style="font-family:'Fira Code', monospace; color:var(--crema);">${window.CoffeeShields.getDomain(target)}</span>
-            <span style="color:var(--mut);">• Conexão Protegida</span>
-          </div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <button class="brand-pill" onclick="window.CoffeeTabs.toggleReaderMode()" style="font-size:10px; padding:2px 8px; display:flex; align-items:center; gap:4px;">
-              ${window.Icons.bookOpen} <span>Modo Leitor</span>
-            </button>
-            <button class="brand-pill" onclick="window.CoffeeTabs.openExternal('${target}')" style="font-size:10px; padding:2px 8px; display:flex; align-items:center; gap:4px;">
-              ${window.Icons.externalLink} <span>Navegador Padrão</span>
-            </button>
-          </div>
-        </div>
-        <div style="flex:1; width:100%; height:100%; position:relative; background:#120A06;">
-          <webview
-            id="webview-${tab.id}"
-            src="${target}"
-            class="tab-webview"
-            allowpopups
-            webpreferences="contextIsolation=false, allowRunningInsecureContent=true">
-          </webview>
-        </div>
+      <div class="webpage-live-wrapper" style="width:100%; height:100%; position:relative; background:#120A06;">
+        <webview
+          id="webview-${tab.id}"
+          src="${target}"
+          class="tab-webview"
+          allowpopups
+          webpreferences="contextIsolation=false, allowRunningInsecureContent=true">
+        </webview>
       </div>
     `;
 
@@ -250,37 +237,21 @@ class CoffeeTabsManager {
     }
 
     // Real Web Pages
-    let target = url;
-    if (!target.startsWith('http://') && !target.startsWith('https://')) {
-      target = `https://${target}`;
+    let target = this.normalizeNavigationUrl(url);
+
+    if (window.CoffeeBookmarks) {
+      window.CoffeeBookmarks.updateVisibility(target);
     }
 
     view.innerHTML = `
-      <div class="webpage-live-wrapper" style="display:flex; flex-direction:column; width:100%; height:100%;">
-        <div class="web-bar" style="display:flex; align-items:center; justify-content:space-between; padding:4px 12px; background:var(--card); border-bottom:1px solid var(--line); font-size:11px; color:var(--t2); -webkit-app-region:no-drag;">
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span style="color:var(--green); display:flex; align-items:center;">${window.Icons.shieldCheck}</span>
-            <span style="font-family:'Fira Code', monospace; color:var(--crema);">${window.CoffeeShields.getDomain(target)}</span>
-            <span style="color:var(--mut);">• Conexão Protegida</span>
-          </div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <button class="brand-pill" onclick="window.CoffeeTabs.toggleReaderMode()" style="font-size:10px; padding:2px 8px; display:flex; align-items:center; gap:4px;">
-              ${window.Icons.bookOpen} <span>Modo Leitor</span>
-            </button>
-            <button class="brand-pill" onclick="window.CoffeeTabs.openExternal('${target}')" style="font-size:10px; padding:2px 8px; display:flex; align-items:center; gap:4px;">
-              ${window.Icons.externalLink} <span>Navegador Padrão</span>
-            </button>
-          </div>
-        </div>
-        <div style="flex:1; width:100%; height:100%; position:relative; background:#120A06;">
-          <webview
-            id="webview-${tab.id}"
-            src="${target}"
-            class="tab-webview"
-            allowpopups
-            webpreferences="contextIsolation=false, allowRunningInsecureContent=true">
-          </webview>
-        </div>
+      <div class="webpage-live-wrapper" style="width:100%; height:100%; position:relative; background:#120A06;">
+        <webview
+          id="webview-${tab.id}"
+          src="${target}"
+          class="tab-webview"
+          allowpopups
+          webpreferences="contextIsolation=false, allowRunningInsecureContent=true">
+        </webview>
       </div>
     `;
 

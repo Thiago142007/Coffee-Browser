@@ -80,8 +80,13 @@ class CoffeeBookmarksManager {
   updateVisibility(url) {
     if (!this.container) return;
     const targetUrl = (url || '').trim().toLowerCase();
-    const isNewTab = !targetUrl || targetUrl.startsWith('cafe://newtab') || targetUrl.startsWith('cafe://nova-aba') || targetUrl === 'about:blank';
-    this.container.style.display = isNewTab ? 'flex' : 'none';
+    const isHome = !targetUrl ||
+                   targetUrl === '' ||
+                   targetUrl.startsWith('cafe://newtab') ||
+                   targetUrl.startsWith('cafe://nova-aba') ||
+                   targetUrl === 'about:blank';
+
+    this.container.style.display = isHome ? 'flex' : 'none';
   }
 
   setupBookmarkDrag(item, bookmarkId) {
