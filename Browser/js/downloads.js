@@ -17,11 +17,13 @@ class CoffeeDownloadManager {
     this.downloads = [];
     this.isPopoverOpen = false;
     this.pollTimer = null;
+    this.autoCloseTimer = null;
+    this.knownDownloadIds = new Set();
   }
 
   init() {
     this.initListeners();
-    this.refreshDownloads();
+    this.refreshDownloads(true);
   }
 
   initListeners() {
@@ -35,22 +37,71 @@ class CoffeeDownloadManager {
       });
     }
 
-    // Close popover when clicking outside
-    document.addEventListener('click', (e) => {
-      const popover = document.getElementById('downloads-popover');
-      const btn = document.getElementById('downloads-btn');
-      if (popover && this.isPopoverOpen) {
-        if (!popover.contains(e.target) && !btn.contains(e.target)) {
+    const popover = document.getElementById('downloads-popover');
+    const btn = document.getElementById('downloads-btn');
+
+    // Pause auto-close if user is hovering over the downloads popover
+    if (popover) {
+      popover.addEventListener('mouseenter', () => {
+        if (this.autoCloseTimer) {
+          clearTimeout(this.autoCloseTimer);
+          this.autoCloseTimer = null;
+        }
+      });
+      popover.addEventListener('mouseleave', () => {
+        // If mouse leaves, close after 1.5s if not manually kept open
+        if (this.isPopoverOpen && !this.manualOpen) {
+          this.autoCloseTimer = setTimeout(() => {
+            this.closePopover();
+          }, 1500);
+        }
+      });
+    }
+
+    // Close popover when clicking outside (in header, tabs, omnibox, body, etc.)
+    document.addEventListener('pointerdown', (e) => {
+      if (this.isPopoverOpen) {
+        const popoverEl = document.getElementById('downloads-popover');
+        const btnEl = document.getElementById('downloads-btn');
+        if (popoverEl && !popoverEl.contains(e.target) && (!btnEl || !btnEl.contains(e.target))) {
           this.closePopover();
         }
       }
+    }, true);
+
+    document.addEventListener('click', (e) => {
+      if (this.isPopoverOpen) {
+        const popoverEl = document.getElementById('downloads-popover');
+        const btnEl = document.getElementById('downloads-btn');
+        if (popoverEl && !popoverEl.contains(e.target) && (!btnEl || !btnEl.contains(e.target))) {
+          this.closePopover();
+        }
+      }
+    }, true);
+
+    // Close popover when window loses focus (e.g. clicking inside webview)
+    window.addEventListener('blur', () => {
+      if (this.isPopoverOpen) {
+        this.closePopover();
+      }
     });
+
+    if (window.BrowserState) {
+      window.BrowserState.on('tabChanged', () => {
+        if (this.isPopoverOpen) this.closePopover();
+      });
+    }
   }
 
   togglePopover() {
     if (this.isPopoverOpen) {
       this.closePopover();
     } else {
+      this.manualOpen = true;
+      if (this.autoCloseTimer) {
+        clearTimeout(this.autoCloseTimer);
+        this.autoCloseTimer = null;
+      }
       this.openPopover();
     }
   }
@@ -64,15 +115,36 @@ class CoffeeDownloadManager {
   }
 
   closePopover() {
+    if (this.autoCloseTimer) {
+      clearTimeout(this.autoCloseTimer);
+      this.autoCloseTimer = null;
+    }
+    this.manualOpen = false;
     const popover = document.getElementById('downloads-popover');
     if (popover) popover.style.display = 'none';
     this.isPopoverOpen = false;
   }
 
-  async refreshDownloads() {
+  showAutoClosingPopover(duration = 1500) {
+    this.manualOpen = false;
+    this.openPopover();
+    if (this.autoCloseTimer) {
+      clearTimeout(this.autoCloseTimer);
+    }
+    this.autoCloseTimer = setTimeout(() => {
+      this.closePopover();
+    }, duration);
+  }
+
+  async refreshDownloads(initial = false) {
     if (ipcRenderer && typeof ipcRenderer.invoke === 'function') {
       try {
         this.downloads = await ipcRenderer.invoke('get-downloads-list');
+        if (initial && Array.isArray(this.downloads)) {
+          this.downloads.forEach(d => {
+            if (d && d.id) this.knownDownloadIds.add(d.id);
+          });
+        }
       } catch(e) {
         this.downloads = [];
       }
@@ -82,6 +154,9 @@ class CoffeeDownloadManager {
 
   onDownloadProgress(data) {
     if (!data || !data.id) return;
+    const isNew = !this.knownDownloadIds.has(data.id);
+    this.knownDownloadIds.add(data.id);
+
     const idx = this.downloads.findIndex(d => d.id === data.id);
     if (idx !== -1) {
       this.downloads[idx] = Object.assign({}, this.downloads[idx], data);
@@ -89,10 +164,15 @@ class CoffeeDownloadManager {
       this.downloads.unshift(data);
     }
     this.updateUI();
+
+    if (isNew) {
+      this.showAutoClosingPopover(1500);
+    }
   }
 
   onDownloadCompleted(data) {
     if (!data || !data.id) return;
+    this.knownDownloadIds.add(data.id);
     const idx = this.downloads.findIndex(d => d.id === data.id);
     if (idx !== -1) {
       this.downloads[idx] = Object.assign({}, this.downloads[idx], data);

@@ -154,6 +154,37 @@ class CoffeeTabsManager {
     return `https://www.google.com/search?q=${encodeURIComponent(text)}`;
   }
 
+  isAuthOrPopupUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    const lower = url.toLowerCase();
+    const authPatterns = [
+      'accounts.google.com',
+      'appleid.apple.com',
+      'login.microsoftonline.com',
+      'login.live.com',
+      'github.com/login',
+      'api.twitter.com/oauth',
+      'twitter.com/i/oauth',
+      'x.com/i/oauth',
+      'facebook.com/dialog/oauth',
+      'facebook.com/v',
+      'discord.com/api/oauth2',
+      'discord.com/oauth2',
+      'auth0.com',
+      'cognito',
+      'firebaseapp.com/__/auth',
+      'supabase.co/auth',
+      'clerk.',
+      'okta.com',
+      'id.twitch.tv/oauth2',
+      'steamcommunity.com/openid',
+      'oauth',
+      'signin',
+      'authorize'
+    ];
+    return authPatterns.some(p => lower.includes(p));
+  }
+
   navigateActiveTab(url) {
     const tab = window.BrowserState.getActiveTab();
     if (!tab) return;
@@ -196,6 +227,8 @@ class CoffeeTabsManager {
       window.CoffeeBookmarks.updateVisibility(target);
     }
 
+    const cleanUA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36';
+
     view.innerHTML = `
       <div class="webpage-live-wrapper" style="width:100%; height:100%; position:relative; background:#120A06;">
         <webview
@@ -203,6 +236,7 @@ class CoffeeTabsManager {
           src="${target}"
           class="tab-webview"
           allowpopups
+          useragent="${cleanUA}"
           webpreferences="contextIsolation=false, allowRunningInsecureContent=true">
         </webview>
       </div>
@@ -246,6 +280,8 @@ class CoffeeTabsManager {
       window.CoffeeBookmarks.updateVisibility(target);
     }
 
+    const cleanUA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36';
+
     view.innerHTML = `
       <div class="webpage-live-wrapper" style="width:100%; height:100%; position:relative; background:#120A06;">
         <webview
@@ -253,6 +289,7 @@ class CoffeeTabsManager {
           src="${target}"
           class="tab-webview"
           allowpopups
+          useragent="${cleanUA}"
           webpreferences="contextIsolation=false, allowRunningInsecureContent=true">
         </webview>
       </div>
@@ -468,12 +505,21 @@ class CoffeeTabsManager {
             }
           }, { passive: false, capture: true });
 
+          // Inform parent window of click on web page to close active dropdowns / popovers
+          document.addEventListener('pointerdown', function() {
+            console.log('[COFFEE_PAGE_CLICK]');
+          }, true);
+
           // Intercept links targeted for new tab/window, Ctrl+Click or Middle-Click
           document.addEventListener('click', function(e) {
             var link = e.target.closest('a');
             if (!link || !link.href) return;
             var target = link.getAttribute('target');
             if (target === '_blank' || target === '_new' || e.ctrlKey || e.metaKey) {
+              var href = (link.href || '').toLowerCase();
+              if (href.includes('accounts.google.com') || href.includes('oauth') || href.includes('signin') || href.includes('login') || href.includes('auth')) {
+                return; // Let standard window.open / OAuth popup handling manage it natively
+              }
               e.preventDefault();
               e.stopPropagation();
               window.open(link.href, '_blank');
@@ -484,6 +530,10 @@ class CoffeeTabsManager {
             if (e.button === 1) {
               var link = e.target.closest('a');
               if (link && link.href) {
+                var href = (link.href || '').toLowerCase();
+                if (href.includes('accounts.google.com') || href.includes('oauth') || href.includes('signin') || href.includes('login') || href.includes('auth')) {
+                  return;
+                }
                 e.preventDefault();
                 e.stopPropagation();
                 window.open(link.href, '_blank');
@@ -497,9 +547,28 @@ class CoffeeTabsManager {
       `).catch(function() {});
     };
 
+    webview.addEventListener('focus', () => {
+      if (window.CoffeeDownloads && window.CoffeeDownloads.isPopoverOpen) {
+        window.CoffeeDownloads.closePopover();
+      }
+      if (window.CoffeeShields && window.CoffeeShields.popover) {
+        window.CoffeeShields.popover.classList.remove('open');
+      }
+    });
+
     webview.addEventListener('console-message', (e) => {
       if (e.message) {
-        if (e.message.startsWith('[COFFEE_ZOOM]:')) {
+        if (e.message === '[COFFEE_PAGE_CLICK]') {
+          if (window.CoffeeDownloads && window.CoffeeDownloads.isPopoverOpen) {
+            window.CoffeeDownloads.closePopover();
+          }
+          if (window.CoffeeShields && window.CoffeeShields.popover) {
+            window.CoffeeShields.popover.classList.remove('open');
+          }
+          if (window.CoffeeOmnibox) {
+            window.CoffeeOmnibox.closeDropdown();
+          }
+        } else if (e.message.startsWith('[COFFEE_ZOOM]:')) {
           const delta = parseFloat(e.message.replace('[COFFEE_ZOOM]:', ''));
           if (delta > 0) {
             this.zoomIn(tab);
@@ -610,9 +679,23 @@ class CoffeeTabsManager {
     });
 
     webview.addEventListener('new-window', (e) => {
+      const targetUrl = e.url || '';
+      const disposition = e.disposition || '';
+      const options = e.options || {};
+
+      const isPopup = disposition === 'new-window' ||
+                      (options && (options.width || options.height)) ||
+                      this.isAuthOrPopupUrl(targetUrl);
+
+      // If it's an OAuth / authentication popup or dialog, allow native Electron popup with window.opener!
+      if (isPopup) {
+        return;
+      }
+
+      // Otherwise, open in a new tab inside Coffee Browser
       e.preventDefault();
-      if (e.url && e.url !== 'about:blank') {
-        this.createTab(e.url);
+      if (targetUrl && targetUrl !== 'about:blank') {
+        this.createTab(targetUrl);
       }
     });
   }

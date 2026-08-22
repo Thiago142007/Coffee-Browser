@@ -84,6 +84,68 @@ app.on('open-url', (event, url) => {
   }
 });
 
+// Clean Standard Chrome User-Agent string to guarantee 100% compatibility with Google Sign-In / OAuth
+const defaultChromiumUA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36';
+const cleanChromeUA = (app.userAgentFallback || defaultChromiumUA)
+  .replace(/\s*Electron\/\S+/i, '')
+  .replace(/\s*CoffeeBrowser\/\S+/i, '')
+  .replace(/\s*cafe\/\S+/i, '')
+  .trim();
+app.userAgentFallback = cleanChromeUA;
+
+// Detect if a window.open request is for OAuth / Google Sign-In / Account Verification / Popup Modal
+function isAuthOrPopupWindow(details) {
+  if (!details || !details.url) return false;
+  const { url, features, disposition } = details;
+
+  // 1. Explicitly requested with popup window features (width, height, popup=1, etc.)
+  if (features && typeof features === 'string' && (
+    features.includes('width=') ||
+    features.includes('height=') ||
+    features.includes('popup=') ||
+    features.includes('menubar=') ||
+    features.includes('toolbar=') ||
+    features.includes('location=')
+  )) {
+    return true;
+  }
+
+  // 2. Disposition requested as a new window popup
+  if (disposition === 'new-window') {
+    return true;
+  }
+
+  // 3. Known OAuth / Authentication / Verification URL patterns
+  const lowerUrl = url.toLowerCase();
+  const authPatterns = [
+    'accounts.google.com',
+    'appleid.apple.com',
+    'login.microsoftonline.com',
+    'login.live.com',
+    'github.com/login',
+    'api.twitter.com/oauth',
+    'twitter.com/i/oauth',
+    'x.com/i/oauth',
+    'facebook.com/dialog/oauth',
+    'facebook.com/v',
+    'discord.com/api/oauth2',
+    'discord.com/oauth2',
+    'auth0.com',
+    'cognito',
+    'firebaseapp.com/__/auth',
+    'supabase.co/auth',
+    'clerk.',
+    'okta.com',
+    'id.twitch.tv/oauth2',
+    'steamcommunity.com/openid',
+    'oauth',
+    'signin',
+    'authorize'
+  ];
+
+  return authPatterns.some(p => lowerUrl.includes(p));
+}
+
 // Enforce Dark Mode by default across all Chromium web contents & engine
 nativeTheme.themeSource = 'dark';
 app.commandLine.appendSwitch('force-dark-mode');
@@ -157,9 +219,39 @@ function createWindow() {
     ]
   };
 
+  // Set clean Chrome User-Agent across all network requests
+  session.defaultSession.setUserAgent(cleanChromeUA);
+
+  session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    const requestHeaders = Object.assign({}, details.requestHeaders);
+    for (const key of Object.keys(requestHeaders)) {
+      if (key.toLowerCase() === 'user-agent') {
+        requestHeaders[key] = cleanChromeUA;
+      }
+    }
+    callback({ cancel: false, requestHeaders });
+  });
+
   session.defaultSession.webRequest.onBeforeRequest(adBlockFilter, (details, callback) => {
     // If Coador is paused globally or on this specific site, do not block request
     if (isAdblockPausedGlobal) {
+      callback({ cancel: false });
+      return;
+    }
+
+    // Never block authentication, Google accounts, Microsoft auth, Apple ID, etc.
+    const u = (details.url || '').toLowerCase();
+    if (
+      u.includes('accounts.google.com') ||
+      u.includes('apis.google.com') ||
+      u.includes('gstatic.com') ||
+      u.includes('googleapis.com') ||
+      u.includes('googleusercontent.com') ||
+      u.includes('appleid.apple.com') ||
+      u.includes('login.microsoftonline.com') ||
+      u.includes('login.live.com') ||
+      u.includes('github.com/login')
+    ) {
       callback({ cancel: false });
       return;
     }
@@ -183,7 +275,7 @@ function createWindow() {
     callback({ cancel: true });
   });
 
-  // Intercept headers globally so any site can be loaded in webview without CSP or frame block
+  // Intercept headers globally so any site can be loaded in webview without CSP, COOP, COEP or frame block
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     const responseHeaders = Object.assign({}, details.responseHeaders);
     delete responseHeaders['x-frame-options'];
@@ -191,6 +283,10 @@ function createWindow() {
     delete responseHeaders['content-security-policy'];
     delete responseHeaders['Content-Security-Policy'];
     delete responseHeaders['frame-options'];
+    delete responseHeaders['cross-origin-opener-policy'];
+    delete responseHeaders['Cross-Origin-Opener-Policy'];
+    delete responseHeaders['cross-origin-embedder-policy'];
+    delete responseHeaders['Cross-Origin-Embedder-Policy'];
     callback({ cancel: false, responseHeaders });
   });
 
@@ -239,28 +335,72 @@ function createWindow() {
     }
   });
 
-  // Prevent target="_blank" from breaking out of the window - open in new tab
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    mainWindow.webContents.executeJavaScript(`
-      if (window.CoffeeTabs) {
-        window.CoffeeTabs.createTab(${JSON.stringify(url)});
+  // Helper for window open handling across main window and child webviews
+  function handleWindowOpen(details) {
+    const { url } = details;
+    if (isAuthOrPopupWindow(details)) {
+      // Parse custom width/height from features if provided
+      let winWidth = 540;
+      let winHeight = 680;
+      if (details.features && typeof details.features === 'string') {
+        const wMatch = details.features.match(/width=(\d+)/i);
+        const hMatch = details.features.match(/height=(\d+)/i);
+        if (wMatch && parseInt(wMatch[1], 10)) winWidth = Math.max(380, Math.min(1200, parseInt(wMatch[1], 10)));
+        if (hMatch && parseInt(hMatch[1], 10)) winHeight = Math.max(420, Math.min(1000, parseInt(hMatch[1], 10)));
       }
-    `);
+
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          width: winWidth,
+          height: winHeight,
+          minWidth: 380,
+          minHeight: 420,
+          center: true,
+          autoHideMenuBar: true,
+          backgroundColor: '#120A06',
+          icon: appIcon,
+          show: true,
+          webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            sandbox: false,
+            webSecurity: true,
+            allowRunningInsecureContent: true
+          }
+        }
+      };
+    }
+
+    // Standard links open as tabs in CoffeeTabs
+    if (mainWindow && !mainWindow.isDestroyed() && url && url !== 'about:blank') {
+      mainWindow.webContents.executeJavaScript(`
+        if (window.CoffeeTabs) {
+          window.CoffeeTabs.createTab(${JSON.stringify(url)});
+        }
+      `);
+    }
     return { action: 'deny' };
+  }
+
+  // Prevent target="_blank" from breaking out of the window - open in new tab or auth popup
+  mainWindow.webContents.setWindowOpenHandler(handleWindowOpen);
+
+  // Intercept all child webviews / windows and apply proper window open handler
+  app.on('web-contents-created', (event, contents) => {
+    contents.setWindowOpenHandler(handleWindowOpen);
   });
 
-  // Intercept all child webviews / windows and open as new browser tabs
-  app.on('web-contents-created', (event, contents) => {
-    contents.setWindowOpenHandler(({ url }) => {
-      if (mainWindow && !mainWindow.isDestroyed() && url && url !== 'about:blank') {
-        mainWindow.webContents.executeJavaScript(`
-          if (window.CoffeeTabs) {
-            window.CoffeeTabs.createTab(${JSON.stringify(url)});
-          }
-        `);
+  // Configure any created popup window (OAuth / Login dialogs)
+  app.on('browser-window-created', (event, win) => {
+    if (win !== mainWindow) {
+      if (appIcon && !appIcon.isEmpty()) {
+        win.setIcon(appIcon);
       }
-      return { action: 'deny' };
-    });
+      win.setMenuBarVisibility(false);
+      win.webContents.setUserAgent(cleanChromeUA);
+      win.webContents.setWindowOpenHandler(handleWindowOpen);
+    }
   });
 
   // Windows Hardware & Mouse Extra Buttons Navigation (Mouse 4 & 5 / App Commands)
