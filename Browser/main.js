@@ -85,12 +85,17 @@ app.on('open-url', (event, url) => {
 });
 
 // Clean Standard Chrome User-Agent string to guarantee 100% compatibility with Google Sign-In / OAuth
-const defaultChromiumUA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36';
-const cleanChromeUA = (app.userAgentFallback || defaultChromiumUA)
-  .replace(/\s*Electron\/\S+/i, '')
-  .replace(/\s*CoffeeBrowser\/\S+/i, '')
-  .replace(/\s*cafe\/\S+/i, '')
-  .trim();
+// IMPORTANT: the Chrome version MUST match the REAL embedded Chromium version (process.versions.chrome).
+// Claiming a different version than the engine (e.g. "Chrome/134" on Chromium 150) creates an inconsistency
+// between the User-Agent header and Sec-CH-UA client hints, which makes Google (and other providers)
+// classify the browser as unsafe/bot and BLOCK the authentication.
+const chromeFullVersion = process.versions.chrome || '134.0.0.0';
+const uaPlatform = process.platform === 'darwin'
+  ? 'Macintosh; Intel Mac OS X 10_15_7'
+  : process.platform === 'linux'
+    ? 'X11; Linux x86_64'
+    : 'Windows NT 10.0; Win64; x64';
+const cleanChromeUA = `Mozilla/5.0 (${uaPlatform}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeFullVersion} Safari/537.36`;
 app.userAgentFallback = cleanChromeUA;
 
 // Detect if a window.open request is for OAuth / Google Sign-In / Account Verification / Popup Modal
@@ -389,6 +394,46 @@ function createWindow() {
   // Intercept all child webviews / windows and apply proper window open handler
   app.on('web-contents-created', (event, contents) => {
     contents.setWindowOpenHandler(handleWindowOpen);
+
+    // Global keyboard shortcuts: F5 = Reload page | F12 = Toggle DevTools console
+    contents.on('before-input-event', (event, input) => {
+      if (!input || input.type !== 'keyDown') return;
+
+      let currentUrl = '';
+      try { currentUrl = contents.getURL() || ''; } catch(e) {}
+      if (currentUrl.startsWith('devtools:')) return;
+
+      const isMainWindowShell = mainWindow && !mainWindow.isDestroyed() && contents === mainWindow.webContents;
+
+      if (input.key === 'F5') {
+        event.preventDefault();
+        if (isMainWindowShell) {
+          mainWindow.webContents.executeJavaScript(`if (window.CoffeeOmnibox) window.CoffeeOmnibox.refreshOrStop();`).catch(() => {});
+        } else {
+          try { contents.reload(); } catch(e) {}
+        }
+      } else if (input.key === 'F12') {
+        event.preventDefault();
+        if (isMainWindowShell) {
+          // Focus is on the browser UI: toggle DevTools of the ACTIVE tab webview
+          mainWindow.webContents.executeJavaScript(`
+            (function() {
+              var wv = document.querySelector('.tab-content-view.active webview');
+              if (!wv) return;
+              try {
+                if (wv.isDevToolsOpened()) wv.closeDevTools();
+                else wv.openDevTools();
+              } catch(e) {}
+            })();
+          `).catch(() => {});
+        } else {
+          try {
+            if (contents.isDevToolsOpened()) contents.closeDevTools();
+            else contents.openDevTools();
+          } catch(e) {}
+        }
+      }
+    });
   });
 
   // Configure any created popup window (OAuth / Login dialogs)

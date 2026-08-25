@@ -227,7 +227,7 @@ class CoffeeTabsManager {
       window.CoffeeBookmarks.updateVisibility(target);
     }
 
-    const cleanUA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36';
+    const cleanUA = (navigator.userAgent || '').replace(/\s*Electron\/\S+/i, '').replace(/\s*CoffeeBrowser\/\S+/i, '').trim();
 
     view.innerHTML = `
       <div class="webpage-live-wrapper" style="width:100%; height:100%; position:relative; background:#120A06;">
@@ -280,7 +280,7 @@ class CoffeeTabsManager {
       window.CoffeeBookmarks.updateVisibility(target);
     }
 
-    const cleanUA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36';
+    const cleanUA = (navigator.userAgent || '').replace(/\s*Electron\/\S+/i, '').replace(/\s*CoffeeBrowser\/\S+/i, '').trim();
 
     view.innerHTML = `
       <div class="webpage-live-wrapper" style="width:100%; height:100%; position:relative; background:#120A06;">
@@ -737,19 +737,8 @@ class CoffeeTabsManager {
   }
 
   focusSearchInput(tabId) {
-    const targetId = tabId || (window.BrowserState && window.BrowserState.activeTabId);
     setTimeout(() => {
-      if (targetId) {
-        const view = document.getElementById(`tab-view-${targetId}`);
-        if (view) {
-          const ntInput = view.querySelector('#nt-search-input');
-          if (ntInput) {
-            ntInput.focus();
-            ntInput.select();
-            return;
-          }
-        }
-      }
+      // Focar sempre o campo de pesquisa do HEADER (omnibox)
       if (window.CoffeeOmnibox && window.CoffeeOmnibox.input) {
         window.CoffeeOmnibox.input.focus();
         window.CoffeeOmnibox.input.select();
