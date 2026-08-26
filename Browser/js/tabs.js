@@ -3,6 +3,16 @@
  * Persistent per-tab isolated WebView architecture
  */
 
+// Preload injected into every guest page (YouTube ad scrubber — see webview-preload.js)
+const COFFEE_WEBVIEW_PRELOAD = (() => {
+  try {
+    const p = require('path');
+    return p.join(__dirname, '..', 'webview-preload.js');
+  } catch (e) {
+    return '';
+  }
+})();
+
 class CoffeeTabsManager {
   constructor() {
     this.tabStrip = document.getElementById('tab-strip');
@@ -237,6 +247,7 @@ class CoffeeTabsManager {
           class="tab-webview"
           allowpopups
           useragent="${cleanUA}"
+          ${COFFEE_WEBVIEW_PRELOAD ? `preload="${COFFEE_WEBVIEW_PRELOAD}"` : ''}
           webpreferences="contextIsolation=false, allowRunningInsecureContent=true">
         </webview>
       </div>
@@ -290,6 +301,7 @@ class CoffeeTabsManager {
           class="tab-webview"
           allowpopups
           useragent="${cleanUA}"
+          ${COFFEE_WEBVIEW_PRELOAD ? `preload="${COFFEE_WEBVIEW_PRELOAD}"` : ''}
           webpreferences="contextIsolation=false, allowRunningInsecureContent=true">
         </webview>
       </div>
