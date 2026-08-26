@@ -9,7 +9,7 @@
 ![Version](https://img.shields.io/badge/vers%C3%A3o-1.0.0-D97706?style=flat-square)
 ![Electron](https://img.shields.io/badge/Electron-43-47848F?style=flat-square&logo=electron&logoColor=white)
 ![Chromium](https://img.shields.io/badge/Chromium-150-4285F4?style=flat-square&logo=googlechrome&logoColor=white)
-![Platform](https://img.shields.io/badge/plataforma-Windows%20x64-0078D6?style=flat-square&logo=windows11&logoColor=white)
+![Platform](https://img.shields.io/badge/plataforma-Windows%20x64%20%7C%20Linux%20x64%20%7C%20Linux%20arm64-0078D6?style=flat-square&logo=linux&logoColor=white)
 
 </div>
 </div>
@@ -68,6 +68,38 @@ cd Coffe-Browser/Browser
 npm install
 npm start
 ```
+
+### Linux
+
+Build multiplataforma (funciona a partir do Windows, Linux ou macOS):
+
+```bash
+cd Browser
+npm run build:linux        # x64
+npm run build:linux-arm64  # ARM64 (Raspberry Pi 5+, etc.)
+```
+
+O pacote é gerado em `Browser/dist/CoffeeBrowser-linux-x64/`. Para executar:
+
+```bash
+cd dist/CoffeeBrowser-linux-x64
+chmod +x CoffeeBrowser
+./CoffeeBrowser
+```
+
+Para integrar ao menu do sistema, crie `~/.local/share/applications/coffee-browser.desktop`:
+
+```ini
+[Desktop Entry]
+Name=Coffee Browser
+Exec=/caminho/para/CoffeeBrowser-linux-x64/CoffeeBrowser
+Icon=/caminho/para/logo.png
+Type=Application
+Categories=Network;WebBrowser;
+StartupWMClass=CoffeeBrowser
+```
+
+> **Nota:** o instalador gráfico (`CoffeeBrowser-Setup.exe`) é exclusivo do Windows. No Linux o navegador roda como pacote portátil. O áudio de sistema no compartilhamento de tela (`loopback`) é um recurso exclusivo do Windows; no Linux compartilhe com microfone.
 
 ## 🔨 Build
 

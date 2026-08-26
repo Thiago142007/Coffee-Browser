@@ -214,7 +214,10 @@ class CoadorEngine {
   }
 
   init(dataDir) {
-    this.dataDir = dataDir || path.join(process.env.APPDATA || process.env.TEMP || '.', 'coador_filters');
+    const fallbackBase = process.env.APPDATA || process.env.XDG_DATA_HOME
+      || path.join(process.env.HOME || process.env.USERPROFILE || '.', '.local', 'share')
+      || process.env.TEMP || '.';
+    this.dataDir = dataDir || path.join(fallbackBase, 'coador_filters');
     try { fs.mkdirSync(this.dataDir, { recursive: true }); } catch (e) {}
   }
 

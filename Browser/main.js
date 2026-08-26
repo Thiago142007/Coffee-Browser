@@ -286,6 +286,7 @@ function createWindow() {
     title: 'Coffee Browser',
     icon: appIcon,
     frame: false, // 100% Frameless custom window
+    autoHideMenuBar: true, // Linux: never show the native menu bar
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: true,
@@ -913,7 +914,8 @@ function setupMediaAndPermissions() {
 
       if (!mainWindow || mainWindow.isDestroyed()) {
         disableThrottleFor(requesterWcId);
-        callback({ video: sources[0], audio: request.audioRequested ? 'loopback' : null });
+        const sysAudio = process.platform === 'win32' ? 'loopback' : null;
+        callback({ video: sources[0], audio: request.audioRequested ? sysAudio : null });
         return;
       }
 
@@ -981,7 +983,7 @@ function setupMediaAndPermissions() {
     }
 
     const selectedSource = pending.sources.find(s => s.id === data.sourceId);
-    const audioMode = data.audio ? 'loopback' : null;
+    const audioMode = data.audio && process.platform === 'win32' ? 'loopback' : null;
 
     if (selectedSource) {
       disableThrottleFor(pending.requesterWcId);

@@ -7,7 +7,9 @@
   "scripts": {
     "start": "electron .",
     "installer": "electron ../Installer",
-    "build:exe": "npx electron-packager . CoffeeBrowser --platform=win32 --arch=x64 --out=dist --overwrite"
+    "build:exe": "npx electron-packager . CoffeeBrowser --platform=win32 --arch=x64 --out=dist --overwrite",
+    "build:linux": "npx electron-packager . CoffeeBrowser --platform=linux --arch=x64 --out=dist --overwrite",
+    "build:linux-arm64": "npx electron-packager . CoffeeBrowser --platform=linux --arch=arm64 --out=dist --overwrite"
   },
   "devDependencies": {
     "@electron/packager": "^19.0.2",
