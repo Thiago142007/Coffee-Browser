@@ -12,13 +12,6 @@
 ![Platform](https://img.shields.io/badge/plataforma-Windows%20x64-0078D6?style=flat-square&logo=windows11&logoColor=white)
 
 </div>
-
----
-
-## 📸 Preview
-
-<div align="center">
-<img src="Browser/assets/preview.jpg" alt="Coffee Browser — Preview" width="800"/>
 </div>
 
 ## ✨ Funcionalidades
