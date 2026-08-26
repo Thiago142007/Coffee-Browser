@@ -63,7 +63,7 @@ Baixe o **`CoffeeBrowser-Setup.exe`** mais recente e execute. O instalador autô
 ### Rodar do código-fonte
 
 ```bash
-git clone https://github.com/Thiago142007/Coffe-Browser.git
+git clone https://github.com/Thiago142007/Coffee-Browser.git
 cd Coffe-Browser/Browser
 npm install
 npm start
