@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Coffee Browser — Navegador Web Desktop com Privacidade Brave",
   "main": "main.js",
-  "author": "Coffee Browser Team",
+  "author": "Dream82342",
   "scripts": {
     "start": "electron .",
     "installer": "electron ../Installer",

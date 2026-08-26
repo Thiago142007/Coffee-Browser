@@ -7,6 +7,15 @@ using System.Reflection;
 using System.Threading;
 using System.Windows.Forms;
 
+[assembly: AssemblyTitle("Coffee Browser Setup")]
+[assembly: AssemblyProduct("Coffee Browser")]
+[assembly: AssemblyCompany("Dream82342")]
+[assembly: AssemblyCopyright("Copyright © Dream82342 2026")]
+[assembly: AssemblyDescription("Instalador do Coffee Browser")]
+[assembly: AssemblyVersion("1.0.0.0")]
+[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyInformationalVersion("1.0.0")]
+
 namespace CoffeeBrowserInstaller
 {
     public class SetupForm : Form
