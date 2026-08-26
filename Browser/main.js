@@ -1,4 +1,4 @@
-const { app, BrowserWindow, session, ipcMain, nativeTheme, nativeImage, shell, desktopCapturer } = require('electron');
+const { app, BrowserWindow, session, ipcMain, nativeTheme, nativeImage, shell, desktopCapturer, Menu, clipboard, webContents } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { CoadorEngine } = require('./adblock');
@@ -155,7 +155,8 @@ function isAuthOrPopupWindow(details) {
 // Enforce Dark Mode by default across all Chromium web contents & engine
 nativeTheme.themeSource = 'dark';
 app.commandLine.appendSwitch('force-dark-mode');
-app.commandLine.appendSwitch('enable-features', 'WebContentsForceDark:choice/reversal_and_color_inversion,DnsOverHttps');
+app.commandLine.appendSwitch('enable-features', 'WebContentsForceDark:choice/reversal_and_color_inversion,DnsOverHttps,WebRtcAllowLoopbackAudio');
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 app.commandLine.appendSwitch('blink-settings', 'forceDarkModeEnabled=true');
 
 // Enforce Cloudflare DNS over HTTPS (1.1.1.1 / DoH) across all Chromium web requests & searches
@@ -418,6 +419,94 @@ function createWindow() {
         if (adblockSiteWhitelist[host] || adblockSiteWhitelist[cleanHost]) return;
         const css = coadorEngine.getCosmeticCss(pageUrl);
         if (css) contents.insertCSS(css, { cssOrigin: 'user' });
+      } catch(e) {}
+    });
+
+    // Native right-click context menu (links, images, videos, text editing)
+    contents.on('context-menu', (event, params) => {
+      try {
+        let ctxUrl = '';
+        try { ctxUrl = contents.getURL() || ''; } catch(e) {}
+        if (ctxUrl.startsWith('devtools:')) return;
+
+        const menu = new Menu();
+
+        const openInNewTab = (url) => {
+          if (!url) return;
+          try {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.executeJavaScript(`if (window.CoffeeTabs && typeof window.CoffeeTabs.createTab === 'function') { window.CoffeeTabs.createTab(${JSON.stringify(url)}); }`).catch(() => {});
+            } else {
+              shell.openExternal(url).catch(() => {});
+            }
+          } catch(e) {}
+        };
+
+        const copyText = (t) => {
+          try {
+            if (typeof t === 'string' && t.length > 0) clipboard.writeText(t);
+          } catch(e) {}
+        };
+
+        const saveMediaAs = (url) => {
+          try {
+            if (url) contents.downloadURL(url);
+          } catch(e) {}
+        };
+
+        const isEmptyArea = !params.linkURL && !params.srcURL && !params.isEditable && !params.selectionText;
+        if (isEmptyArea) {
+          let canBack = false;
+          let canFwd = false;
+          try {
+            canBack = contents.navigationHistory.canGoBack();
+            canFwd = contents.navigationHistory.canGoForward();
+          } catch (e) {
+            try { canBack = contents.canGoBack(); canFwd = contents.canGoForward(); } catch(e2) {}
+          }
+          menu.append(new MenuItem({ label: 'Voltar', enabled: canBack, click: () => { try { contents.goBack(); } catch(e){} } }));
+          menu.append(new MenuItem({ label: 'Avançar', enabled: canFwd, click: () => { try { contents.goForward(); } catch(e){} } }));
+          menu.append(new MenuItem({ label: 'Recarregar', click: () => { try { contents.reload(); } catch(e){} } }));
+        }
+
+        if (params.linkURL) {
+          menu.append(new MenuItem({ label: 'Abrir link em nova aba', click: () => openInNewTab(params.linkURL) }));
+          menu.append(new MenuItem({ label: 'Copiar endereço do link', click: () => copyText(params.linkURL) }));
+        }
+
+        if (params.mediaType === 'image') {
+          if (!params.linkURL) menu.append(new MenuItem({ label: 'Abrir imagem em nova aba', click: () => openInNewTab(params.srcURL) }));
+          menu.append(new MenuItem({ label: 'Copiar imagem', click: () => { try { contents.copyImageAt(params.x, params.y); } catch(e){} } }));
+          menu.append(new MenuItem({ label: 'Copiar endereço da imagem', click: () => copyText(params.srcURL) }));
+          menu.append(new MenuItem({ label: 'Salvar imagem como...', click: () => saveMediaAs(params.srcURL) }));
+        } else if (params.mediaType === 'video') {
+          menu.append(new MenuItem({ label: 'Copiar endereço do vídeo', click: () => copyText(params.srcURL) }));
+          if (params.srcURL) menu.append(new MenuItem({ label: 'Salvar vídeo como...', click: () => saveMediaAs(params.srcURL) }));
+        } else if (params.mediaType === 'audio') {
+          menu.append(new MenuItem({ label: 'Copiar endereço do áudio', click: () => copyText(params.srcURL) }));
+          if (params.srcURL) menu.append(new MenuItem({ label: 'Salvar áudio como...', click: () => saveMediaAs(params.srcURL) }));
+        }
+
+        if (params.isEditable) {
+          menu.append(new MenuItem({ role: 'undo', label: 'Desfazer' }));
+          menu.append(new MenuItem({ role: 'redo', label: 'Refazer' }));
+          menu.append(new MenuItem({ type: 'separator' }));
+          menu.append(new MenuItem({ role: 'cut', label: 'Cortar' }));
+          menu.append(new MenuItem({ role: 'copy', label: 'Copiar' }));
+          menu.append(new MenuItem({ role: 'paste', label: 'Colar' }));
+          menu.append(new MenuItem({ role: 'selectAll', label: 'Selecionar tudo' }));
+        } else if (params.selectionText) {
+          menu.append(new MenuItem({ role: 'copy', label: 'Copiar' }));
+        }
+
+        if (menu.items.length === 0) return;
+        let ownerWin = null;
+        try { ownerWin = contents.getOwnerBrowserWindow(); } catch(e) {}
+        if (ownerWin && !ownerWin.isDestroyed()) {
+          menu.popup({ window: ownerWin });
+        } else {
+          menu.popup();
+        }
       } catch(e) {}
     });
   });
@@ -760,6 +849,41 @@ ipcMain.handle('open-download-folder', (event, savePath) => {
 const pendingScreenShareRequests = new Map();
 
 function setupMediaAndPermissions() {
+  // Tabs that are sharing the screen must NEVER be background-throttled,
+  // otherwise the transmission freezes when the tab loses focus.
+  const screenShareWcIds = new Set();
+
+  function findWcById(wcId) {
+    if (!wcId) return null;
+    try {
+      return webContents.getAllWebContents().find((w) => w.id === wcId) || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function disableThrottleFor(wcId) {
+    const wc = findWcById(wcId);
+    try {
+      if (wc && !wc.isDestroyed()) {
+        wc.setBackgroundThrottling(false);
+        screenShareWcIds.add(wc.id);
+        wc.once('destroyed', () => screenShareWcIds.delete(wc.id));
+      }
+    } catch (e) {}
+  }
+
+  function restoreThrottleFor(wcId) {
+    if (!wcId) return;
+    const wc = findWcById(wcId);
+    try {
+      if (wc && !wc.isDestroyed()) {
+        wc.setBackgroundThrottling(true);
+      }
+    } catch (e) {}
+    screenShareWcIds.delete(wcId);
+  }
+
   // Allow camera, microphone, screen capture, notifications, etc.
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
     callback(true);
@@ -772,6 +896,10 @@ function setupMediaAndPermissions() {
   // Handle getDisplayMedia (Screen Sharing) for all tabs & webviews
   session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
     try {
+      let requesterWC = null;
+      try { requesterWC = webContents.fromFrame(request.frame); } catch (e) { requesterWC = null; }
+      const requesterWcId = requesterWC ? requesterWC.id : null;
+
       const sources = await desktopCapturer.getSources({
         types: ['screen', 'window'],
         thumbnailSize: { width: 500, height: 300 },
@@ -784,6 +912,7 @@ function setupMediaAndPermissions() {
       }
 
       if (!mainWindow || mainWindow.isDestroyed()) {
+        disableThrottleFor(requesterWcId);
         callback({ video: sources[0], audio: request.audioRequested ? 'loopback' : null });
         return;
       }
@@ -811,7 +940,8 @@ function setupMediaAndPermissions() {
         callback,
         sources,
         request,
-        timeoutId
+        timeoutId,
+        requesterWcId
       });
 
       let requestingOrigin = request.securityOrigin || '';
@@ -845,20 +975,25 @@ function setupMediaAndPermissions() {
     pendingScreenShareRequests.delete(data.requestId);
 
     if (data.canceled || !data.sourceId) {
+      restoreThrottleFor(pending.requesterWcId);
       pending.callback({});
       return;
     }
 
     const selectedSource = pending.sources.find(s => s.id === data.sourceId);
+    const audioMode = data.audio ? 'loopback' : null;
+
     if (selectedSource) {
+      disableThrottleFor(pending.requesterWcId);
       pending.callback({
         video: selectedSource,
-        audio: data.audio ? 'loopback' : (pending.request.audioRequested ? 'loopback' : null)
+        audio: audioMode
       });
     } else {
+      disableThrottleFor(pending.requesterWcId);
       pending.callback({
         video: pending.sources[0],
-        audio: data.audio ? 'loopback' : null
+        audio: audioMode
       });
     }
   });
