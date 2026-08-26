@@ -333,32 +333,9 @@ class CoffeeTabsManager {
             }
           } catch(e) {}
 
-          // 1. Injetar Regras Cosméticas do Coador APENAS SE ESTIVER ATIVO NESTE SITE
+          // 1. Coador YouTube & Video AdBlock Engine APENAS SE ESTIVER ATIVO NESTE SITE
+          // (o bloqueio cosmético real de EasyList é injetado pelo processo principal)
           if (${isShieldActive}) {
-            if (!document.getElementById('__coador_adblock_css')) {
-              const style = document.createElement('style');
-              style.id = '__coador_adblock_css';
-              style.textContent = \`
-                .ad, .ads, .advertisement, .ad-banner, .ad-container, .ad-box,
-                [id^="google_ads"], [id^="ad-"], [id^="gpt-ad"], [id*="ad_slot"],
-                [class*="sponsored"], [class*="ad-banner"], [class*="ad_container"],
-                [class*="advertisement"], iframe[src*="doubleclick"], iframe[src*="googleadservices"],
-                iframe[src*="googlesyndication"], iframe[src*="taboola"], iframe[src*="outbrain"],
-                .ytp-ad-module, .ytp-ad-player-overlay, .ytp-ad-overlay-container,
-                .video-ads, #player-ads, ytd-ad-slot-renderer, ytd-promoted-sparkles-web-renderer,
-                ytd-banner-promo-renderer, ytd-in-feed-ad-layout-renderer {
-                  display: none !important;
-                  visibility: hidden !important;
-                  height: 0 !important;
-                  width: 0 !important;
-                  opacity: 0 !important;
-                  pointer-events: none !important;
-                }
-              \`;
-              (document.head || document.documentElement).appendChild(style);
-            }
-
-            // 2. Coador YouTube & Video AdBlock Engine (Brave & uBlock Level)
             (function setupYouTubeAdBlock() {
               try {
                 if (window.ytInitialPlayerResponse) {
@@ -438,32 +415,15 @@ class CoffeeTabsManager {
                 }
               }
 
-              // React to YouTube SPA navigation events
               ['yt-navigate-start', 'yt-navigate-finish', 'yt-page-data-updated', 'spfdone'].forEach(evt => {
                 window.addEventListener(evt, cleanYouTubeAds);
               });
             })();
-          } else {
-            // Se o Coador estiver desativado para este site, remover regras de bloqueio
-            const adCss = document.getElementById('__coador_adblock_css');
-            if (adCss) adCss.remove();
           }
 
-          // 3. Anti-Adblock Defuser (Bypass de avisos e detecção de adblock)
+          // 2. Remove avisos de anti-adblock (sem flags globais detectáveis)
           (function setupAntiAdblockDefuser() {
             try {
-              window.canRunAds = true;
-              window.isAdBlockActive = false;
-              window.google_ad_status = 1;
-              window.adsBlocked = false;
-
-              // Neutralize common tracking/ad blocker testing stubs
-              if (!window.ga) window.ga = function() {};
-              if (!window.gtag) window.gtag = function() {};
-              if (!window.fbq) window.fbq = function() {};
-              if (!window.adsbygoogle) window.adsbygoogle = [];
-
-              // Remove Anti-Adblock blocking modals & restore scroll
               const removeModals = () => {
                 const antiAdblockModals = document.querySelectorAll(
                   '[class*="adblock-modal"], [id*="adblock-overlay"], [class*="adblock-backdrop"], [class*="paywall-overlay"], .tp-modal, .tp-backdrop, [id*="adblock-message"], [class*="ad-blocker-message"]'

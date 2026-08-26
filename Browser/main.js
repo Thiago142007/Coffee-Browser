@@ -1,6 +1,7 @@
 const { app, BrowserWindow, session, ipcMain, nativeTheme, nativeImage, shell, desktopCapturer } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { CoadorEngine } = require('./adblock');
 
 // Set Windows App User Model ID so the custom logo appears on the Windows Taskbar & Alt+Tab
 if (process.platform === 'win32') {
@@ -165,6 +166,36 @@ let mainWindow;
 let isAdblockPausedGlobal = false;
 let adblockSiteWhitelist = {};
 
+// Coador — Real Filter Engine (EasyList/EasyPrivacy)
+const coadorEngine = new CoadorEngine();
+let coadorPendingBlocks = 0;
+let coadorFlushTimer = null;
+
+function notifyCoadorBlock(count) {
+  coadorPendingBlocks += count;
+  if (coadorFlushTimer) return;
+  coadorFlushTimer = setTimeout(() => {
+    const n = coadorPendingBlocks;
+    coadorPendingBlocks = 0;
+    coadorFlushTimer = null;
+    if (n > 0 && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('coador-blocked-ad', { count: n });
+    }
+  }, 400);
+}
+
+const AUTH_DOMAIN_WHITELIST = [
+  'accounts.google.com',
+  'apis.google.com',
+  'gstatic.com',
+  'googleapis.com',
+  'googleusercontent.com',
+  'appleid.apple.com',
+  'login.microsoftonline.com',
+  'login.live.com',
+  'github.com/login'
+];
+
 // Listen to Coador state updates from renderer
 ipcMain.on('update-coador-state', (event, data) => {
   if (data) {
@@ -174,56 +205,6 @@ ipcMain.on('update-coador-state', (event, data) => {
 });
 
 function createWindow() {
-  // Coador — Brave-style Native Ad & Tracker Blocker Engine
-  const adBlockFilter = {
-    urls: [
-      '*://*.doubleclick.net/*',
-      '*://*.googleadservices.com/*',
-      '*://*.googlesyndication.com/*',
-      '*://*.adnxs.com/*',
-      '*://*.ads.pubmatic.com/*',
-      '*://*.criteo.com/*',
-      '*://*.criteo.net/*',
-      '*://*.taboola.com/*',
-      '*://*.outbrain.com/*',
-      '*://*.amazon-adsystem.com/*',
-      '*://*.rubiconproject.com/*',
-      '*://*.openx.net/*',
-      '*://*.popads.net/*',
-      '*://*.popcash.net/*',
-      '*://*.propellerads.com/*',
-      '*://*.adcolony.com/*',
-      '*://*.adroll.com/*',
-      '*://*.smartadserver.com/*',
-      '*://*.mgid.com/*',
-      '*://*.revcontent.com/*',
-      '*://*.trafficfactory.biz/*',
-      '*://*.zergnet.com/*',
-      '*://*.adsterra.com/*',
-      '*://*.scorecardresearch.com/*',
-      '*://*.hotjar.com/*',
-      '*://*.clarity.ms/*',
-      '*://*.analytics.twitter.com/*',
-      '*://*.google-analytics.com/*',
-      '*://*.facebook.com/tr/*',
-      '*://*.connect.facebook.net/*/fbevents.js*',
-      '*://*.monetag.com/*',
-      '*://*.clickadu.com/*',
-      '*://*.exoclick.com/*',
-      '*://*.juicyads.com/*',
-      '*://*.hilltopads.com/*',
-      '*://*.mc.yandex.ru/*',
-      '*://*.mixpanel.com/*',
-      '*://*.segment.io/*',
-      '*://*.heapanalytics.com/*',
-      '*://*.intercom.io/widget/*',
-      '*://*.clicky.com/*',
-      '*://*.mouseflow.com/*',
-      '*://*.matomo.org/*',
-      '*://*.piwik.pro/*'
-    ]
-  };
-
   // Set clean Chrome User-Agent across all network requests
   session.defaultSession.setUserAgent(cleanChromeUA);
 
@@ -237,26 +218,15 @@ function createWindow() {
     callback({ cancel: false, requestHeaders });
   });
 
-  session.defaultSession.webRequest.onBeforeRequest(adBlockFilter, (details, callback) => {
-    // If Coador is paused globally or on this specific site, do not block request
-    if (isAdblockPausedGlobal) {
+  // Coador — Real network-level blocking via EasyList/EasyPrivacy engine
+  session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
+    if (isAdblockPausedGlobal || !coadorEngine.ready) {
       callback({ cancel: false });
       return;
     }
 
-    // Never block authentication, Google accounts, Microsoft auth, Apple ID, etc.
     const u = (details.url || '').toLowerCase();
-    if (
-      u.includes('accounts.google.com') ||
-      u.includes('apis.google.com') ||
-      u.includes('gstatic.com') ||
-      u.includes('googleapis.com') ||
-      u.includes('googleusercontent.com') ||
-      u.includes('appleid.apple.com') ||
-      u.includes('login.microsoftonline.com') ||
-      u.includes('login.live.com') ||
-      u.includes('github.com/login')
-    ) {
+    if (AUTH_DOMAIN_WHITELIST.some((a) => u.includes(a))) {
       callback({ cancel: false });
       return;
     }
@@ -272,12 +242,13 @@ function createWindow() {
       }
     } catch(e) {}
 
-    try {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('coador-blocked-ad', { url: details.url });
-      }
-    } catch(e) {}
-    callback({ cancel: true });
+    if (coadorEngine.shouldBlock(details.url, details.type, details.initiator)) {
+      notifyCoadorBlock(1);
+      callback({ cancel: true });
+      return;
+    }
+
+    callback({ cancel: false });
   });
 
   // Intercept headers globally so any site can be loaded in webview without CSP, COOP, COEP or frame block
@@ -433,6 +404,21 @@ function createWindow() {
           } catch(e) {}
         }
       }
+    });
+
+    // Coador cosmetic filters — inject real EasyList element-hiding CSS per page
+    contents.on('dom-ready', () => {
+      try {
+        const pageUrl = contents.getURL();
+        if (!pageUrl || !/^https?:/i.test(pageUrl)) return;
+        if (isAdblockPausedGlobal || !coadorEngine.ready) return;
+        let host = '';
+        try { host = new URL(pageUrl).hostname; } catch(e) { return; }
+        const cleanHost = host.replace(/^www\./, '');
+        if (adblockSiteWhitelist[host] || adblockSiteWhitelist[cleanHost]) return;
+        const css = coadorEngine.getCosmeticCss(pageUrl);
+        if (css) contents.insertCSS(css, { cssOrigin: 'user' });
+      } catch(e) {}
     });
   });
 
@@ -879,6 +865,8 @@ function setupMediaAndPermissions() {
 }
 
 app.whenReady().then(() => {
+  coadorEngine.init(app.getPath('userData'));
+  coadorEngine.ensureReady().catch(() => {});
   setupMediaAndPermissions();
   setupDownloadManager();
   createWindow();

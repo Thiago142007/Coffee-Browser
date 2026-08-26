@@ -87,15 +87,16 @@ class CoffeeShieldsController {
     window.BrowserState.on('tabChanged', () => this.updateShieldUI());
     window.BrowserState.on('tabNavigated', () => this.onTabNavigated());
 
-    // Listen to network-level ad blocks from main process
+    // Listen to network-level ad blocks from main process (REAL block events, batched)
     try {
       if (typeof require !== 'undefined') {
         const { ipcRenderer } = require('electron');
-        ipcRenderer.on('coador-blocked-ad', () => {
+        ipcRenderer.on('coador-blocked-ad', (event, data) => {
+          const count = (data && typeof data.count === 'number' && data.count > 0) ? data.count : 1;
           const activeTab = window.BrowserState.getActiveTab();
           if (activeTab && !activeTab.url.startsWith('cafe://') && this.isShieldActiveForUrl(activeTab.url)) {
-            activeTab.blockedOnPage = (activeTab.blockedOnPage || 0) + 1;
-            window.BrowserState.addShieldStats(1, false);
+            activeTab.blockedOnPage = (activeTab.blockedOnPage || 0) + count;
+            window.BrowserState.addShieldStats(count, activeTab.url.startsWith('https://'));
             this.updateShieldUI();
           }
         });
@@ -226,48 +227,11 @@ class CoffeeShieldsController {
   }
 
   onTabNavigated() {
+    // Real block counts now arrive exclusively via 'coador-blocked-ad' IPC events
     const tab = window.BrowserState.getActiveTab();
     if (!tab) return;
-    
-    if (tab.url.startsWith('cafe://') || tab.url.startsWith('about:')) {
-      tab.blockedOnPage = 0;
-    } else {
-      const isHttps = tab.url.startsWith('https://');
-      const isShieldOn = this.isShieldActiveForUrl(tab.url);
-
-      if (isShieldOn) {
-        const domain = this.getDomain(tab.url);
-        let blocked = 3;
-        if (domain.includes('google') || domain.includes('facebook') || domain.includes('amazon') || domain.includes('yahoo')) {
-          blocked = 8;
-        } else if (domain.includes('news') || domain.includes('globo') || domain.includes('uol') || domain.includes('g1')) {
-          blocked = 14;
-        } else if (domain.includes('github') || domain.includes('wikipedia') || domain.includes('duckduckgo')) {
-          blocked = 1;
-        } else {
-          blocked = Math.floor(Math.abs(this.hashCode(domain)) % 7) + 2;
-        }
-
-        tab.blockedOnPage = blocked;
-        window.BrowserState.addShieldStats(blocked, isHttps);
-      } else {
-        tab.blockedOnPage = 0;
-        if (isHttps) {
-          window.BrowserState.addShieldStats(0, true);
-        }
-      }
-    }
-
+    tab.blockedOnPage = 0;
     this.updateShieldUI();
-  }
-
-  hashCode(str) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      hash = (hash << 5) - hash + str.charCodeAt(i);
-      hash |= 0;
-    }
-    return hash;
   }
 
   isShieldActiveForUrl(url) {
