@@ -7,6 +7,56 @@
  * No Node APIs are used — safe under sandbox or isolated contexts.
  */
 (function () {
+  // ---- Chrome Client-Hints identity (runs on EVERY host, before page scripts) ----
+  // Google/OAuth rejects logins with "browser may not be secure" when
+  // navigator.userAgentData brands expose Electron. Spoof Chrome-like brands
+  // derived from the real engine version in the User-Agent (never hardcoded).
+  try {
+    var _ua = String((typeof navigator !== 'undefined' && navigator.userAgent) || '');
+    var _m = _ua.match(/Chrome\/(\d+)\.(\d+)\.(\d+)\.(\d+)/);
+    var _full = _m ? (_m[1] + '.' + _m[2] + '.' + _m[3] + '.' + _m[4]) : '150.0.0.0';
+    var _major = _m ? _m[1] : '150';
+    var _plat = /Macintosh/.test(_ua) ? 'macOS' : (/Linux/.test(_ua) ? 'Linux' : 'Windows');
+    var _brands = [
+      { brand: 'Chromium', version: _major },
+      { brand: 'Google Chrome', version: _major },
+      { brand: 'Not-A.Brand', version: '99' }
+    ];
+    var _fullBrands = [
+      { brand: 'Chromium', version: _full },
+      { brand: 'Google Chrome', version: _full },
+      { brand: 'Not-A.Brand', version: '99.0.0.0' }
+    ];
+    var _uad = {
+      brands: _brands,
+      mobile: false,
+      platform: _plat,
+      getHighEntropyValues: function (hints) {
+        try {
+          var out = {
+            brands: _brands, fullVersionList: _fullBrands, mobile: false, platform: _plat,
+            architecture: 'x86', bitness: '64', model: '',
+            platformVersion: '', uaFullVersion: _full, wow64: false
+          };
+          if (Object.prototype.toString.call(hints) === '[object Array]' && hints.length) {
+            var filtered = {};
+            for (var i = 0; i < hints.length; i++) {
+              if (hints[i] in out) filtered[hints[i]] = out[hints[i]];
+            }
+            return Promise.resolve(filtered);
+          }
+          return Promise.resolve(out);
+        } catch (e) { return Promise.resolve({}); }
+      },
+      toJSON: function () { return { brands: _brands, mobile: false, platform: _plat }; }
+    };
+    try {
+      Object.defineProperty(navigator, 'userAgentData', { configurable: true, get: function () { return _uad; } });
+    } catch (e) {
+      try { navigator.userAgentData = _uad; } catch (e2) {}
+    }
+  } catch (e) {}
+
   try {
     var loc = window.location || {};
     var host = String(loc.hostname || '');

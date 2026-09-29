@@ -2,6 +2,9 @@
  * Coffee Browser State Management
  */
 
+// Build marker — bump on every release so About + diagnostics prove which build is running.
+window.COFFEE_BUILD_ID = '1.0.2+diag';
+
 class EventEmitter {
   constructor() {
     this.events = {};
@@ -47,6 +50,9 @@ class BrowserState extends EventEmitter {
     this.startupBehavior = data.startupBehavior || 'newtab'; // 'newtab', 'continue', 'custom'
     this.showBookmarksBar = data.showBookmarksBar !== undefined ? data.showBookmarksBar : true;
     this.hardwareAcceleration = data.hardwareAcceleration !== undefined ? data.hardwareAcceleration : true;
+    this.showFooterLatency = data.showFooterLatency !== undefined ? data.showFooterLatency : true;
+    this.showFooterMemory = data.showFooterMemory !== undefined ? data.showFooterMemory : true;
+    this.forceDarkMode = data.forceDarkMode !== undefined ? data.forceDarkMode : false;
 
     // Shields Settings (Brave Shields style)
     this.shieldsEnabled = data.shieldsEnabled !== undefined ? data.shieldsEnabled : true;
@@ -132,6 +138,9 @@ class BrowserState extends EventEmitter {
       startupBehavior: this.startupBehavior,
       showBookmarksBar: this.showBookmarksBar,
       hardwareAcceleration: this.hardwareAcceleration,
+      showFooterLatency: this.showFooterLatency,
+      showFooterMemory: this.showFooterMemory,
+      forceDarkMode: this.forceDarkMode,
       shieldsEnabled: this.shieldsEnabled,
       shieldsAggressive: this.shieldsAggressive,
       httpsUpgrade: this.httpsUpgrade,

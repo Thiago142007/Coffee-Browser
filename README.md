@@ -22,7 +22,7 @@
 | 🔐 **Login real (Google/OAuth)** | User-Agent consistente com o Chromium embarcado — sign-in do Google, Microsoft, Discord e outros funciona de verdade |
 | 🌐 **DoH Cloudflare** | DNS-over-HTTPS seguro (1.1.1.1) para todas as requisições |
 | 🖥️ **Terminal integrado** | Emulador de terminal embutido (`cafe://terminal`) |
-| 🌙 **Modo escuro forçado** | Tema escuro aplicado por padrão em todos os sites |
+| 🌙 **Modo escuro nas páginas (opcional)** | Forçamento de tema escuro desativado por padrão; ativável em Configurações → Aparência |
 | ⬇️ **Gerenciador de downloads** | Progresso em tempo real, pausar/resumir/cancelar/refazer e histórico persistente |
 | 📺 **Compartilhamento de tela** | Captura de tela/janela com seletor visual nativo |
 | 🧩 **Multi-abas reais** | Cada aba é uma instância Chromium completa via `<webview>` |

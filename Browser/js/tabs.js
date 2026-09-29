@@ -319,29 +319,36 @@ class CoffeeTabsManager {
 
     const injectPageListeners = () => {
       const isShieldActive = window.CoffeeShields ? window.CoffeeShields.isShieldActiveForUrl(tab.url) : true;
+      const forceDarkMode = !!(window.BrowserState && window.BrowserState.forceDarkMode);
       webview.executeJavaScript(`
         (function() {
-          // 0. Forçar Modo Escuro por Padrão em Todos os Sites
+          // 0. Forçar Modo Escuro nas páginas (respeita Configurações > Aparência; OFF por padrão)
           try {
-            if (!document.getElementById('__coffee_darkmode_engine')) {
-              const dmStyle = document.createElement('style');
-              dmStyle.id = '__coffee_darkmode_engine';
-              dmStyle.textContent = \`
-                :root, html {
-                  color-scheme: dark !important;
-                }
-                meta[name="color-scheme"] {
-                  content: dark !important;
-                }
-              \`;
-              (document.head || document.documentElement).appendChild(dmStyle);
+            const coffeeForceDark = ${forceDarkMode};
+            const prevStyle = document.getElementById('__coffee_darkmode_engine');
+            if (coffeeForceDark) {
+              if (!prevStyle) {
+                const dmStyle = document.createElement('style');
+                dmStyle.id = '__coffee_darkmode_engine';
+                dmStyle.textContent = \`
+                  :root, html {
+                    color-scheme: dark !important;
+                  }
+                \`;
+                (document.head || document.documentElement).appendChild(dmStyle);
 
-              if (!document.querySelector('meta[name="color-scheme"]')) {
-                const meta = document.createElement('meta');
-                meta.name = 'color-scheme';
-                meta.content = 'dark';
-                (document.head || document.documentElement).appendChild(meta);
+                if (!document.querySelector('meta[name="color-scheme"][data-coffee-dm]')) {
+                  const meta = document.createElement('meta');
+                  meta.name = 'color-scheme';
+                  meta.content = 'dark';
+                  meta.setAttribute('data-coffee-dm', '1');
+                  (document.head || document.documentElement).appendChild(meta);
+                }
               }
+            } else {
+              if (prevStyle) prevStyle.remove();
+              const ownMeta = document.querySelector('meta[name="color-scheme"][data-coffee-dm]');
+              if (ownMeta) ownMeta.remove();
             }
           } catch(e) {}
 

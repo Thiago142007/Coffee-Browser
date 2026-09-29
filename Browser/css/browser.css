@@ -1275,8 +1275,8 @@ input:checked + .slider:before {
 ======================================================== */
 .session-restore-popup {
   position: fixed;
-  bottom: 32px;
-  right: 24px;
+  top: 108px;
+  right: 16px;
   background: var(--card);
   border: 1px solid var(--caramel);
   border-radius: var(--radius-lg);

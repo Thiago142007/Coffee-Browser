@@ -99,6 +99,33 @@ const uaPlatform = process.platform === 'darwin'
 const cleanChromeUA = `Mozilla/5.0 (${uaPlatform}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeFullVersion} Safari/537.36`;
 app.userAgentFallback = cleanChromeUA;
 
+// Chrome Client-Hints identity (anti "browser not secure" on Google/OAuth login).
+// Electron brands itself in the Sec-CH-UA* headers AND in navigator.userAgentData,
+// which makes Google classify the browser as unsafe even with a clean User-Agent.
+// These values mirror the clean UA above (same engine version, desktop platform).
+const chromeMajorVersion = String(chromeFullVersion).split('.')[0] || '150';
+const clientHintsPlatform = process.platform === 'darwin' ? 'macOS' : (process.platform === 'linux' ? 'Linux' : 'Windows');
+const chromeClientUa = `"Chromium";v="${chromeMajorVersion}", "Google Chrome";v="${chromeMajorVersion}", "Not-A.Brand";v="99"`;
+const chromeClientUaFull = `"Chromium";v="${chromeFullVersion}", "Google Chrome";v="${chromeFullVersion}", "Not-A.Brand";v="99.0.0.0"`;
+
+function applyChromeClientHints(requestHeaders) {
+  for (const key of Object.keys(requestHeaders)) {
+    const lower = key.toLowerCase();
+    if (lower === 'user-agent') {
+      requestHeaders[key] = cleanChromeUA;
+    } else if (lower === 'sec-ch-ua') {
+      requestHeaders[key] = chromeClientUa;
+    } else if (lower === 'sec-ch-ua-mobile') {
+      requestHeaders[key] = '?0';
+    } else if (lower === 'sec-ch-ua-platform') {
+      requestHeaders[key] = `"${clientHintsPlatform}"`;
+    } else if (lower === 'sec-ch-ua-full-version-list') {
+      requestHeaders[key] = chromeClientUaFull;
+    }
+  }
+  return requestHeaders;
+}
+
 // Detect if a window.open request is for OAuth / Google Sign-In / Account Verification / Popup Modal
 function isAuthOrPopupWindow(details) {
   if (!details || !details.url) return false;
@@ -152,12 +179,60 @@ function isAuthOrPopupWindow(details) {
   return authPatterns.some(p => lowerUrl.includes(p));
 }
 
-// Enforce Dark Mode by default across all Chromium web contents & engine
-nativeTheme.themeSource = 'dark';
-app.commandLine.appendSwitch('force-dark-mode');
-app.commandLine.appendSwitch('enable-features', 'WebContentsForceDark:choice/reversal_and_color_inversion,DnsOverHttps,WebRtcAllowLoopbackAudio');
+// Hardware Acceleration (ON by default; toggle in Settings > System).
+// Disabling the GPU is startup-only, so the persisted preference is read here
+// (pre-ready, best effort) and applied before Chromium initializes.
+function getHwAccelPrefPath() {
+  try { return path.join(app.getPath('userData'), 'hardware_acceleration.json'); } catch(e) { return null; }
+}
+function loadHwAccelEnabled() {
+  try {
+    const p = getHwAccelPrefPath();
+    if (p && fs.existsSync(p)) {
+      const data = JSON.parse(fs.readFileSync(p, 'utf8'));
+      if (data && typeof data.enabled === 'boolean') return data.enabled;
+    }
+  } catch(e) {}
+  return true;
+}
+let hardwareAccelerationEnabled = loadHwAccelEnabled();
+if (!hardwareAccelerationEnabled) {
+  try { app.disableHardwareAcceleration(); } catch(e) {}
+}
+
+// Force Dark Mode on pages — OFF by default, toggle in Settings > Appearance.
+// The Chromium auto-darkening switches below only take effect at launch, so the
+// persisted preference is read here (pre-ready, best effort) and applied.
+function getForceDarkPrefPath() {
+  try { return path.join(app.getPath('userData'), 'force_dark_mode.json'); } catch(e) { return null; }
+}
+function loadForceDarkEnabled() {
+  try {
+    const p = getForceDarkPrefPath();
+    if (p && fs.existsSync(p)) {
+      const data = JSON.parse(fs.readFileSync(p, 'utf8'));
+      return !!(data && data.enabled);
+    }
+  } catch(e) {}
+  return false;
+}
+let forceDarkModeEnabled = loadForceDarkEnabled();
+
+// Dark Mode forcing (OFF by default). Startup-only Chromium switches are appended
+// ONLY when previously enabled; nativeTheme can additionally be flipped at runtime via IPC.
+// NOTE: keep a single combined enable-features switch (Chromium honors the last one,
+// so splitting it would silently drop DNS-over-HTTPS).
+nativeTheme.themeSource = forceDarkModeEnabled ? 'dark' : 'system';
+if (forceDarkModeEnabled) {
+  app.commandLine.appendSwitch('force-dark-mode');
+  app.commandLine.appendSwitch('blink-settings', 'forceDarkModeEnabled=true');
+}
+{
+  const extraFeatures = ['DnsOverHttps', 'WebRtcAllowLoopbackAudio'];
+  if (forceDarkModeEnabled) extraFeatures.unshift('WebContentsForceDark:choice/reversal_and_color_inversion');
+  app.commandLine.appendSwitch('enable-features', extraFeatures.join(','));
+}
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
-app.commandLine.appendSwitch('blink-settings', 'forceDarkModeEnabled=true');
 
 // Enforce Cloudflare DNS over HTTPS (1.1.1.1 / DoH) across all Chromium web requests & searches
 app.commandLine.appendSwitch('dns-over-https-templates', 'https://cloudflare-dns.com/dns-query{?dns}');
@@ -211,11 +286,7 @@ function createWindow() {
 
   session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
     const requestHeaders = Object.assign({}, details.requestHeaders);
-    for (const key of Object.keys(requestHeaders)) {
-      if (key.toLowerCase() === 'user-agent') {
-        requestHeaders[key] = cleanChromeUA;
-      }
-    }
+    applyChromeClientHints(requestHeaders);
     callback({ cancel: false, requestHeaders });
   });
 
@@ -340,8 +411,12 @@ function createWindow() {
           icon: appIcon,
           show: true,
           webPreferences: {
+            preload: path.join(__dirname, 'webview-preload.js'),
             nodeIntegration: false,
-            contextIsolation: true,
+            // Shares the page realm so the UA-spoof preload (Client-Hints identity)
+            // applies to page JS — required for Google/OAuth "secure browser" checks.
+            // No Node APIs are exposed to the page (nodeIntegration stays off).
+            contextIsolation: false,
             sandbox: false,
             webSecurity: true,
             allowRunningInsecureContent: true
@@ -613,6 +688,43 @@ ipcMain.handle('is-window-maximized', (event) => {
   return win && !win.isDestroyed() ? win.isMaximized() : false;
 });
 
+// Force Dark Mode preference (Settings > Appearance, default OFF)
+ipcMain.handle('get-force-dark-mode', () => {
+  return { enabled: forceDarkModeEnabled };
+});
+ipcMain.handle('set-force-dark-mode', (event, enabled) => {
+  forceDarkModeEnabled = !!enabled;
+  try {
+    const p = getForceDarkPrefPath();
+    if (p) fs.writeFileSync(p, JSON.stringify({ enabled: forceDarkModeEnabled }));
+  } catch(e) {}
+  // Instant effect for color-scheme-aware sites; full compositor-level forcing
+  // applies on next launch (renderer shows a relaunch hint).
+  try { nativeTheme.themeSource = forceDarkModeEnabled ? 'dark' : 'system'; } catch(e) {}
+  return { enabled: forceDarkModeEnabled, needsRestart: true };
+});
+
+ipcMain.handle('relaunch-app', () => {
+  try { app.relaunch(); } catch(e) { return false; }
+  try { app.exit(0); } catch(e) {}
+  return true;
+});
+
+// Hardware Acceleration preference (Settings > System, default ON)
+ipcMain.handle('get-hardware-acceleration', () => {
+  return { enabled: hardwareAccelerationEnabled };
+});
+
+ipcMain.handle('set-hardware-acceleration', (event, enabled) => {
+  hardwareAccelerationEnabled = !!enabled;
+  try {
+    const p = getHwAccelPrefPath();
+    if (p) fs.writeFileSync(p, JSON.stringify({ enabled: hardwareAccelerationEnabled }));
+  } catch(e) {}
+  // GPU mode is startup-only: the renderer shows a relaunch hint.
+  return { enabled: hardwareAccelerationEnabled, needsRestart: true };
+});
+
 // Telemetry: Real Total RAM calculation across all browser processes
 ipcMain.handle('get-system-memory', async () => {
   try {
@@ -663,7 +775,7 @@ ipcMain.handle('get-network-latency', async () => {
           resolve(val);
         };
 
-        socket.setTimeout(1800);
+        socket.setTimeout(1200);
 
         socket.connect(target.port, target.host, () => {
           const rtt = Math.max(1, Math.round(performance.now() - start));

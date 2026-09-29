@@ -423,6 +423,49 @@ class PagesContentRenderer {
             </label>
           </div>
         </div>
+
+        <div class="feature-widget-card" style="margin-bottom:16px;">
+          <div class="widget-title">${this.t('settings_appearance_footer_title', 'Barra de Status (Rodapé)')}</div>
+          <div style="font-size:11.5px; color:var(--mut); margin:4px 0 12px;">${this.t('settings_appearance_footer_sub', 'Escolha quais monitores aparecem no rodapé do navegador.')}</div>
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-top:1px solid var(--line);">
+            <div>
+              <div style="font-size:13px; color:var(--crema); font-weight:600;">${this.t('settings_footer_latency_label', 'Exibir Latência')}</div>
+              <div style="font-size:11.5px; color:var(--mut);">${this.t('settings_footer_latency_desc', 'Mostra o ping da rede no rodapé, atualizado a cada 1,5s.')}</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" ${s.showFooterLatency !== false ? 'checked' : ''} onchange="if (window.CoffeeApp && window.CoffeeApp.setFooterVisibility) window.CoffeeApp.setFooterVisibility('latency', this.checked);">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-top:1px solid var(--line);">
+            <div>
+              <div style="font-size:13px; color:var(--crema); font-weight:600;">${this.t('settings_footer_memory_label', 'Exibir Memória')}</div>
+              <div style="font-size:11.5px; color:var(--mut);">${this.t('settings_footer_memory_desc', 'Mostra o uso de memória RAM no rodapé, atualizado a cada 1,5s.')}</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" ${s.showFooterMemory !== false ? 'checked' : ''} onchange="if (window.CoffeeApp && window.CoffeeApp.setFooterVisibility) window.CoffeeApp.setFooterVisibility('memory', this.checked);">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="feature-widget-card" style="margin-bottom:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <div style="font-size:13px; color:var(--crema); font-weight:600;">${this.t('settings_force_dark_label', 'Forçar Modo Escuro nas Páginas')}</div>
+              <div style="font-size:11.5px; color:var(--mut);">${this.t('settings_force_dark_desc', 'Escurece todos os sites automaticamente. Vem desativado por padrão.')}</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" ${s.forceDarkMode ? 'checked' : ''} onchange="if (window.CoffeeApp && window.CoffeeApp.setForceDarkMode) window.CoffeeApp.setForceDarkMode(this.checked);">
+              <span class="slider"></span>
+            </label>
+          </div>
+          ${window.__coffeeForceDarkDirty ? `
+          <div style="margin-top:12px; padding:10px 12px; background:var(--elev); border:1px solid var(--line); border-radius:6px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <div style="font-size:11.5px; color:var(--t2);">${this.t('settings_force_dark_restart_note', 'O escurecimento completo é aplicado ao iniciar. Reinicie para aplicar.')}</div>
+            <button class="brand-pill" style="font-size:11px; font-weight:700; white-space:nowrap;" onclick="if (window.CoffeeApp && window.CoffeeApp.relaunchApp) window.CoffeeApp.relaunchApp();">${this.t('settings_force_dark_restart_btn', 'Reiniciar agora')}</button>
+          </div>` : ''}
+        </div>
       </div>
     `;
   }
@@ -572,10 +615,15 @@ class PagesContentRenderer {
               <div style="font-size:11.5px; color:var(--mut);">${this.t('settings_system_gpu_desc', 'Usar aceleração de GPU gráfica quando disponível.')}</div>
             </div>
             <label class="toggle-switch">
-              <input type="checkbox" ${s.hardwareAcceleration ? 'checked' : ''} onchange="window.BrowserState.hardwareAcceleration = this.checked; window.BrowserState.saveState();">
+              <input type="checkbox" ${s.hardwareAcceleration ? 'checked' : ''} onchange="if (window.CoffeeApp && window.CoffeeApp.setHardwareAcceleration) window.CoffeeApp.setHardwareAcceleration(this.checked);">
               <span class="slider"></span>
             </label>
           </div>
+          ${window.__coffeeHwAccelDirty ? `
+          <div style="margin-top:12px; padding:10px 12px; background:var(--elev); border:1px solid var(--line); border-radius:6px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <div style="font-size:11.5px; color:var(--t2);">${this.t('settings_system_restart_note', 'A alteração da GPU é aplicada ao iniciar. Reinicie para aplicar.')}</div>
+            <button class="brand-pill" style="font-size:11px; font-weight:700; white-space:nowrap;" onclick="if (window.CoffeeApp && window.CoffeeApp.relaunchApp) window.CoffeeApp.relaunchApp();">${this.t('settings_force_dark_restart_btn', 'Reiniciar agora')}</button>
+          </div>` : ''}
         </div>
       </div>
     `;
@@ -594,10 +642,16 @@ class PagesContentRenderer {
             </div>
             <div>
               <div style="font-size:16px; font-weight:700; color:var(--crema);">${this.t('settings_about_app_name', 'Coffee Browser Desktop')}</div>
-              <div style="font-size:12px; color:var(--mut);">${this.t('settings_about_version', 'Versão 1.0.0 (Windows x64 Executable)')}</div>
+              <div style="font-size:12px; color:var(--mut);">${this.t('settings_about_version', 'Versão 1.0.0 (Windows x64 Executable)')} • Build ${window.COFFEE_BUILD_ID || '?'}</div>
               <div style="font-size:11px; color:var(--green); margin-top:4px;">${this.t('settings_about_up_to_date', 'O Coffee Browser está atualizado.')}</div>
             </div>
           </div>
+        </div>
+
+        <div class="feature-widget-card" style="margin-top:16px;">
+          <div class="widget-title">${this.t('settings_about_diag_title', 'Diagnóstico da Sessão')}</div>
+          <div style="font-size:11.5px; color:var(--mut); margin:4px 0 10px;">${this.t('settings_about_diag_hint', 'Dados técnicos para suporte: identidade do navegador e estado da sessão.')}</div>
+          <pre style="font-size:10.5px; line-height:1.5; color:var(--t2); background:var(--term); border:1px solid var(--line); border-radius:6px; padding:10px 12px; overflow-x:auto; white-space:pre-wrap; word-break:break-word;">${(() => { try { return JSON.stringify(getCoffeeDiagnostics(), null, 1).replace(/</g, '&lt;'); } catch(e) { return 'indisponível'; } })()}</pre>
         </div>
       </div>
     `;

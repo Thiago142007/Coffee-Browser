@@ -3,19 +3,37 @@
  */
 
 // Native Electron Window Bridge
-let ipcRenderer = null;
+// NOTE: named appIpcRenderer (not plain ipcRenderer) because downloads.js already
+// declares a top-level binding with the plain name in this shared renderer realm —
+// redeclaring it here would throw SyntaxError and kill this entire file.
+let appIpcRenderer = null;
 
 function getIpc() {
-  if (ipcRenderer) return ipcRenderer;
+  if (appIpcRenderer) return appIpcRenderer;
   try {
-    if (typeof require !== 'undefined') {
+    // 1. Preload bridge (always available when preload.js runs)
+    if (typeof window !== 'undefined' && window.ipcRenderer && typeof window.ipcRenderer.invoke === 'function') {
+      appIpcRenderer = window.ipcRenderer;
+    } else if (typeof window !== 'undefined' && window.electron && window.electron.ipcRenderer && typeof window.electron.ipcRenderer.invoke === 'function') {
+      appIpcRenderer = window.electron.ipcRenderer;
+    } else if (typeof require !== 'undefined') {
       const electron = require('electron');
-      ipcRenderer = electron.ipcRenderer;
-    } else if (window.electron && window.electron.ipcRenderer) {
-      ipcRenderer = window.electron.ipcRenderer;
+      appIpcRenderer = electron.ipcRenderer;
     }
   } catch(e) {}
-  return ipcRenderer;
+  return appIpcRenderer;
+}
+
+/**
+ * IPC invoke with a hard timeout so a stalled main-process probe can never
+ * block the 1.5s footer refresh cadence. Resolves `null` on timeout/error.
+ */
+function invokeWithTimeout(ipc, channel, timeoutMs, ...args) {
+  if (!ipc || typeof ipc.invoke !== 'function') return Promise.resolve(null);
+  return Promise.race([
+    ipc.invoke(channel, ...args).catch(() => null),
+    new Promise((resolve) => setTimeout(() => resolve(null), timeoutMs))
+  ]);
 }
 
 let isWindowMaximized = false;
@@ -89,6 +107,47 @@ window.CoffeeApp = {
 };
 
 function initCoffeeApp() {
+  // Telemetry FIRST: the footer must keep updating even if another init step throws.
+  try { startTelemetryLoops(); } catch(e) {}
+  try { applyFooterVisibility(); } catch(e) {}
+
+  // Sync Force Dark Mode preference with the main process (pref file wins).
+  try {
+    const ipc0 = getIpc();
+    if (ipc0 && typeof ipc0.invoke === 'function') {
+      invokeWithTimeout(ipc0, 'get-force-dark-mode', 1500).then((v) => {
+        try {
+          // Never clobber a toggle the user already made this session.
+          if (window.__coffeeForceDarkDirty) return;
+          if (!v || typeof v.enabled !== 'boolean') return;
+          const on = v.enabled;
+          if (window.BrowserState && window.BrowserState.forceDarkMode !== on) {
+            window.BrowserState.forceDarkMode = on;
+            window.BrowserState.saveState();
+          }
+          applyForceDarkToOpenTabs();
+        } catch(e) {}
+      });
+    }
+  } catch(e) {}
+
+  // Sync Hardware Acceleration preference with the main process (pref file wins).
+  try {
+    const ipc0b = getIpc();
+    if (ipc0b && typeof ipc0b.invoke === 'function') {
+      invokeWithTimeout(ipc0b, 'get-hardware-acceleration', 1500).then((v) => {
+        try {
+          if (window.__coffeeHwAccelDirty) return;
+          if (!v || typeof v.enabled !== 'boolean') return;
+          if (window.BrowserState && window.BrowserState.hardwareAcceleration !== v.enabled) {
+            window.BrowserState.hardwareAcceleration = v.enabled;
+            window.BrowserState.saveState();
+          }
+        } catch(e) {}
+      });
+    }
+  } catch(e) {}
+
   // Bind Window Controls (Minimize, Maximize, Close) with clean single-click handlers
   const minBtn = document.getElementById('win-min-btn');
   const maxBtn = document.getElementById('win-max-btn');
@@ -155,15 +214,7 @@ function initCoffeeApp() {
     });
   }
 
-  // Initialize Telemetry Engine & Loops immediately
-  pollLatency();
-  pollMemory();
-  setInterval(pollLatency, 2500);
-  setInterval(pollMemory, 1500);
-
-  // Initialize Clock & Telemetry UI Loop
-  setInterval(updateLiveTelemetry, 1000);
-  updateLiveTelemetry();
+  // Telemetry loops already started at the top of init (1.5s cadence, idempotent).
 
   // Online / Offline event listeners for instant UI update
   window.addEventListener('online', () => {
@@ -210,8 +261,8 @@ function initCoffeeApp() {
     window.CoffeeBookmarks = new CoffeeBookmarksManager();
   }
 
-  // Check for crashed session to offer 10s restore popup
-  setTimeout(checkForCrashedSession, 600);
+  // Check previous session to offer the Brave-style reopen popup (top-right)
+  setTimeout(checkForPreviousSession, 600);
 
   // Initial Welcome Toast
   setTimeout(() => {
@@ -226,27 +277,81 @@ if (document.readyState === 'loading') {
 }
 
 let restorePopupTimer = null;
+let restorePopupMode = 'reopen'; // 'crash' | 'reopen'
 
-function checkForCrashedSession() {
+/**
+ * Tabs worth offering to reopen: skips private tabs and trivial blank pages.
+ */
+function getRestorableTabs() {
+  try {
+    const raw = localStorage.getItem('coffee_last_session_tabs');
+    if (!raw) return [];
+    const saved = JSON.parse(raw);
+    if (!Array.isArray(saved)) return [];
+    return saved.filter((t) => {
+      if (!t || t.isPrivate) return false;
+      const url = (t.url || '').trim().toLowerCase();
+      if (!url || url === 'cafe://newtab' || url === 'about:blank') return false;
+      return true;
+    });
+  } catch(e) { return []; }
+}
+
+function checkForPreviousSession() {
   try {
     const wasActive = localStorage.getItem('coffee_session_active');
-    const savedTabsRaw = localStorage.getItem('coffee_last_session_tabs');
 
     // Mark current session as active
     localStorage.setItem('coffee_session_active', 'true');
 
-    if (wasActive === 'true' && savedTabsRaw) {
-      const savedTabs = JSON.parse(savedTabsRaw);
-      if (Array.isArray(savedTabs) && savedTabs.length > 0) {
-        showRestorePopup();
-      }
+    const restorable = getRestorableTabs();
+    if (restorable.length === 0) {
+      try { localStorage.setItem('coffee_last_popup_decision', 'skipped:empty'); } catch(e) {}
+      return;
     }
+
+    // "Continue where you left off" restores silently — no need to ask.
+    if (window.BrowserState && window.BrowserState.startupBehavior === 'continue') {
+      try { localStorage.setItem('coffee_last_popup_decision', 'skipped:continue-auto'); } catch(e) {}
+      restorePreviousSession();
+      return;
+    }
+
+    try { localStorage.setItem('coffee_last_popup_decision', 'shown:' + (wasActive === 'true' ? 'crash' : 'reopen')); } catch(e) {}
+    showRestorePopup(wasActive === 'true' ? 'crash' : 'reopen');
   } catch(e) {}
 }
 
-function showRestorePopup() {
+function showRestorePopup(mode) {
   const popup = document.getElementById('session-restore-popup');
   if (!popup) return;
+  restorePopupMode = (mode === 'crash') ? 'crash' : 'reopen';
+
+  // Mode-specific, fully translated copy (Brave-style reopen vs crash recovery)
+  try {
+    const t = (k, fb) => (window.CoffeeI18n ? window.CoffeeI18n.t(k, fb) : (fb || k));
+    const titleEl = popup.querySelector('.restore-popup-title');
+    const textEl = popup.querySelector('.restore-popup-text');
+    const btnEl = document.getElementById('restore-session-btn');
+    if (restorePopupMode === 'crash') {
+      if (titleEl) titleEl.textContent = t('restore_title', 'Aviso de Recuperação');
+      if (textEl) textEl.textContent = t('restore_desc', 'Suas abas foram fechadas de forma inesperada!');
+      if (btnEl) btnEl.textContent = t('restore_btn', 'Restaurar');
+    } else {
+      if (titleEl) titleEl.textContent = t('reopen_title', 'Restaurar abas?');
+      if (textEl) textEl.textContent = t('reopen_desc', 'Gostaria de voltar às abas que estavam abertas?');
+      if (btnEl) btnEl.textContent = t('reopen_btn', 'Reabrir');
+    }
+  } catch(e) {}
+
+  // Pin below the top toolbar (under the Settings gear), whatever its height is.
+  try {
+    const header = document.querySelector('.browser-header');
+    if (header && header.offsetHeight > 0) {
+      popup.style.top = (header.offsetHeight + 12) + 'px';
+      popup.style.bottom = 'auto';
+    }
+  } catch(e) {}
 
   clearTimeout(restorePopupTimer);
   popup.style.display = 'flex';
@@ -275,25 +380,25 @@ function dismissRestorePopup() {
 
 function restorePreviousSession() {
   try {
-    const savedTabsRaw = localStorage.getItem('coffee_last_session_tabs');
-    if (savedTabsRaw && window.CoffeeTabs && window.BrowserState) {
-      const savedTabs = JSON.parse(savedTabsRaw);
-      if (Array.isArray(savedTabs) && savedTabs.length > 0) {
-        // Clear current tabs and recreate saved tabs
-        window.BrowserState.tabs = [];
-        document.querySelectorAll('.tab-content-view').forEach(v => v.remove());
+    const restorable = getRestorableTabs();
+    if (restorable.length > 0 && window.CoffeeTabs && window.BrowserState) {
+      // Clear current tabs and recreate saved tabs (private tabs are never restored)
+      window.BrowserState.tabs = [];
+      document.querySelectorAll('.tab-content-view').forEach(v => v.remove());
 
-        savedTabs.forEach((t) => {
-          const newTab = window.CoffeeTabs.createTab(t.url || 'cafe://newtab', t.isPrivate || false);
-          if (t.title) newTab.title = t.title;
-          if (t.iconType) newTab.iconType = t.iconType;
-          if (t.zoomFactor) newTab.zoomFactor = t.zoomFactor;
-        });
+      restorable.forEach((t) => {
+        const newTab = window.CoffeeTabs.createTab(t.url || 'cafe://newtab', false);
+        if (t.title) newTab.title = t.title;
+        if (t.iconType) newTab.iconType = t.iconType;
+        if (t.zoomFactor) newTab.zoomFactor = t.zoomFactor;
+      });
 
-        const firstTab = window.BrowserState.tabs[0];
-        if (firstTab) {
-          window.CoffeeTabs.switchTab(firstTab.id);
-        }
+      const firstTab = window.BrowserState.tabs[0];
+      if (firstTab) {
+        window.CoffeeTabs.switchTab(firstTab.id);
+      }
+      if (typeof window.CoffeeTabs.saveSessionSnapshot === 'function') {
+        window.CoffeeTabs.saveSessionSnapshot();
       }
     }
   } catch(e) {
@@ -305,8 +410,13 @@ function restorePreviousSession() {
 window.restorePreviousSession = restorePreviousSession;
 window.dismissRestorePopup = dismissRestorePopup;
 
-// Clean shutdown flag on normal close
+// Persist the tab snapshot on close so the reopen popup always has fresh data
 window.addEventListener('beforeunload', () => {
+  try {
+    if (window.CoffeeTabs && typeof window.CoffeeTabs.saveSessionSnapshot === 'function') {
+      window.CoffeeTabs.saveSessionSnapshot();
+    }
+  } catch(e) {}
   localStorage.setItem('coffee_session_active', 'false');
 });
 
@@ -409,7 +519,7 @@ async function measureNetworkLatency() {
   const ipc = getIpc();
   if (ipc && typeof ipc.invoke === 'function') {
     try {
-      const res = await ipc.invoke('get-network-latency');
+      const res = await invokeWithTimeout(ipc, 'get-network-latency', 1300);
       if (res && typeof res.latencyMs === 'number' && res.latencyMs >= 0) {
         return res.latencyMs;
       }
@@ -433,7 +543,7 @@ async function measureNetworkLatency() {
             resolve(val);
           };
 
-          socket.setTimeout(1800);
+          socket.setTimeout(1200);
 
           socket.connect(80, '1.1.1.1', () => {
             const rtt = Math.max(1, Math.round(performance.now() - start));
@@ -460,7 +570,7 @@ async function measureNetworkLatency() {
   try {
     const start = performance.now();
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 2000);
+    const timer = setTimeout(() => controller.abort(), 1200);
 
     await fetch(`https://1.1.1.1/cdn-cgi/trace?_t=${Date.now()}`, {
       method: 'GET',
@@ -474,7 +584,7 @@ async function measureNetworkLatency() {
     try {
       const start2 = performance.now();
       const controller2 = new AbortController();
-      const timer2 = setTimeout(() => controller2.abort(), 2000);
+      const timer2 = setTimeout(() => controller2.abort(), 1200);
 
       await fetch(`https://www.google.com/generate_204?_t=${Date.now()}`, {
         method: 'HEAD',
@@ -498,7 +608,7 @@ async function fetchRealMemoryKB() {
   const ipc = getIpc();
   if (ipc && typeof ipc.invoke === 'function') {
     try {
-      const data = await ipc.invoke('get-system-memory');
+      const data = await invokeWithTimeout(ipc, 'get-system-memory', 1000);
       if (data && typeof data.workingSetKB === 'number' && data.workingSetKB > 0) {
         return data.workingSetKB;
       }
@@ -527,11 +637,219 @@ async function fetchRealMemoryKB() {
   return Math.round((120 + tabCount * 35) * 1024);
 }
 
+// Footer telemetry refresh cadence (latency + memory)
+const TELEMETRY_INTERVAL_MS = 1500;
+let telemetryLoopsStarted = false;
+
+/**
+ * Starts the footer telemetry loops. Idempotent and exception-proof: every
+ * callback is individually guarded so a failure can never freeze the footer.
+ */
+function startTelemetryLoops() {
+  if (telemetryLoopsStarted) return;
+  telemetryLoopsStarted = true;
+  const safe = (fn) => { try { fn(); } catch(e) {} };
+  safe(pollLatency);
+  safe(pollMemory);
+  safe(updateLiveTelemetry);
+  setInterval(() => safe(pollLatency), TELEMETRY_INTERVAL_MS);
+  setInterval(() => safe(pollMemory), TELEMETRY_INTERVAL_MS);
+  setInterval(() => safe(updateLiveTelemetry), 1000);
+}
+
+/**
+ * Shows/hides the Latency and Memory footer items per user settings.
+ */
+function applyFooterVisibility() {
+  try {
+    const showLat = !window.BrowserState || window.BrowserState.showFooterLatency !== false;
+    const showMem = !window.BrowserState || window.BrowserState.showFooterMemory !== false;
+    const latItem = document.getElementById('status-latency-item');
+    if (latItem) latItem.style.display = showLat ? '' : 'none';
+    const memItem = document.getElementById('status-memory-item');
+    if (memItem) memItem.style.display = showMem ? '' : 'none';
+  } catch(e) {}
+}
+
+/**
+ * Persists the footer visibility preference and refreshes the footer immediately.
+ * @param {'latency'|'memory'} which
+ * @param {boolean} visible
+ */
+function setFooterVisibility(which, visible) {
+  try {
+    if (window.BrowserState) {
+      if (which === 'latency') window.BrowserState.showFooterLatency = !!visible;
+      else if (which === 'memory') window.BrowserState.showFooterMemory = !!visible;
+      window.BrowserState.saveState();
+    }
+  } catch(e) {}
+  applyFooterVisibility();
+  try {
+    if (visible && which === 'latency') pollLatency();
+    if (visible && which === 'memory') pollMemory();
+    updateLiveTelemetry();
+  } catch(e) {}
+}
+
+// Expose footer/telemetry controls on the existing CoffeeApp bridge
+try {
+  window.CoffeeApp.applyFooterVisibility = applyFooterVisibility;
+  window.CoffeeApp.setFooterVisibility = setFooterVisibility;
+  window.CoffeeApp.refreshTelemetry = () => {
+    try { pollLatency(); } catch(e) {}
+    try { pollMemory(); } catch(e) {}
+    try { updateLiveTelemetry(); } catch(e) {}
+  };
+} catch(e) {}
+
+// ==========================================
+// Force Dark Mode on pages (Settings > Appearance, default OFF)
+// ==========================================
+function buildForceDarkSnippet(enabled) {
+  const on = enabled ? 'true' : 'false';
+  return `(function(){try{var on=${on};var s=document.getElementById('__coffee_darkmode_engine');`
+    + `if(on){if(!s){var st=document.createElement('style');st.id='__coffee_darkmode_engine';`
+    + `st.textContent=':root,html{color-scheme:dark !important}';(document.head||document.documentElement).appendChild(st);}`
+    + `if(!document.querySelector('meta[name="color-scheme"][data-coffee-dm]')){var m=document.createElement('meta');`
+    + `m.name='color-scheme';m.content='dark';m.setAttribute('data-coffee-dm','1');`
+    + `(document.head||document.documentElement).appendChild(m);}}`
+    + `else{if(s)s.remove();var om=document.querySelector('meta[name="color-scheme"][data-coffee-dm]');if(om)om.remove();}}catch(e){}})();`;
+}
+
+/**
+ * Applies/removes the page darkening on every already-open tab webview instantly.
+ * (Fresh navigations are handled by the tabs.js injection; full compositor-level
+ * forcing applies on next launch — see the relaunch hint in Settings.)
+ */
+function applyForceDarkToOpenTabs() {
+  try {
+    const on = !!(window.BrowserState && window.BrowserState.forceDarkMode);
+    const snippet = buildForceDarkSnippet(on);
+    const views = document.querySelectorAll('webview.tab-webview');
+    views.forEach((wv) => {
+      try {
+        if (wv && typeof wv.executeJavaScript === 'function') {
+          const r = wv.executeJavaScript(snippet);
+          if (r && typeof r.catch === 'function') r.catch(() => {});
+        }
+      } catch(e) {}
+    });
+  } catch(e) {}
+}
+
+/**
+ * Persists the Force Dark Mode preference, notifies the main process
+ * (instant nativeTheme effect), updates open tabs and flags the relaunch hint.
+ */
+async function setForceDarkMode(enabled) {
+  const on = !!enabled;
+  try {
+    if (window.BrowserState) {
+      window.BrowserState.forceDarkMode = on;
+      window.BrowserState.saveState();
+    }
+  } catch(e) {}
+  try {
+    const ipc = getIpc();
+    if (ipc && typeof ipc.invoke === 'function') {
+      await invokeWithTimeout(ipc, 'set-force-dark-mode', 2000, on);
+    }
+  } catch(e) {}
+  try { applyForceDarkToOpenTabs(); } catch(e) {}
+  try { window.__coffeeForceDarkDirty = true; } catch(e) {}
+  try { if (typeof window.showSettingsSection === 'function') window.showSettingsSection('appearance'); } catch(e) {}
+  return on;
+}
+
+async function relaunchApp() {
+  try {
+    const ipc = getIpc();
+    if (ipc && typeof ipc.invoke === 'function') {
+      await invokeWithTimeout(ipc, 'relaunch-app', 2000);
+    }
+  } catch(e) {}
+}
+
+try {
+  window.CoffeeApp.setForceDarkMode = setForceDarkMode;
+  window.CoffeeApp.applyForceDarkToOpenTabs = applyForceDarkToOpenTabs;
+  window.CoffeeApp.relaunchApp = relaunchApp;
+} catch(e) {}
+
+// ==========================================
+// Hardware Acceleration (Settings > System, default ON)
+// ==========================================
+/**
+ * Persists the GPU preference, notifies the main process and flags the
+ * relaunch hint (GPU mode can only change at startup).
+ */
+async function setHardwareAcceleration(enabled) {
+  const on = !!enabled;
+  try {
+    if (window.BrowserState) {
+      window.BrowserState.hardwareAcceleration = on;
+      window.BrowserState.saveState();
+    }
+  } catch(e) {}
+  try {
+    const ipc = getIpc();
+    if (ipc && typeof ipc.invoke === 'function') {
+      await invokeWithTimeout(ipc, 'set-hardware-acceleration', 2000, on);
+    }
+  } catch(e) {}
+  try { window.__coffeeHwAccelDirty = true; } catch(e) {}
+  try { if (typeof window.showSettingsSection === 'function') window.showSettingsSection('system'); } catch(e) {}
+  return on;
+}
+
+try {
+  window.CoffeeApp.setHardwareAcceleration = setHardwareAcceleration;
+} catch(e) {}
+
+// ==========================================
+// Diagnostics (About > card + window.CoffeeDiagnostics())
+// ==========================================
+function getCoffeeDiagnostics() {
+  const d = { build: null, userAgent: null, brands: null, sessionActive: null, savedTabs: 0, restorableTabs: 0, popupDecision: null, prefs: {} };
+  try { d.build = window.COFFEE_BUILD_ID || 'unknown'; } catch(e) {}
+  try { d.userAgent = (typeof navigator !== 'undefined' && navigator.userAgent) || null; } catch(e) {}
+  try {
+    const uad = (typeof navigator !== 'undefined' && navigator.userAgentData) || null;
+    d.brands = (uad && Array.isArray(uad.brands)) ? uad.brands.map((b) => `${b.brand}@${b.version}`) : null;
+  } catch(e) {}
+  try { d.sessionActive = localStorage.getItem('coffee_session_active'); } catch(e) {}
+  try {
+    const raw = localStorage.getItem('coffee_last_session_tabs');
+    const arr = raw ? JSON.parse(raw) : [];
+    d.savedTabs = Array.isArray(arr) ? arr.length : 0;
+  } catch(e) {}
+  try { d.restorableTabs = getRestorableTabs().length; } catch(e) {}
+  try { d.popupDecision = localStorage.getItem('coffee_last_popup_decision'); } catch(e) {}
+  try {
+    if (window.BrowserState) {
+      d.prefs = {
+        forceDarkMode: !!window.BrowserState.forceDarkMode,
+        hardwareAcceleration: window.BrowserState.hardwareAcceleration !== false,
+        showFooterLatency: window.BrowserState.showFooterLatency !== false,
+        showFooterMemory: window.BrowserState.showFooterMemory !== false,
+        startupBehavior: window.BrowserState.startupBehavior || null
+      };
+    }
+  } catch(e) {}
+  return d;
+}
+
+try { window.CoffeeDiagnostics = getCoffeeDiagnostics; } catch(e) {}
+
 /**
  * Periodic latency measurement polling
  */
 async function pollLatency() {
   if (isLatencyProbeRunning) return;
+  try {
+    if (window.BrowserState && window.BrowserState.showFooterLatency === false) return;
+  } catch(e) {}
   isLatencyProbeRunning = true;
   try {
     const lat = await measureNetworkLatency();
@@ -550,6 +868,9 @@ async function pollLatency() {
  */
 async function pollMemory() {
   if (isMemoryProbeRunning) return;
+  try {
+    if (window.BrowserState && window.BrowserState.showFooterMemory === false) return;
+  } catch(e) {}
   isMemoryProbeRunning = true;
   try {
     const mem = await fetchRealMemoryKB();
@@ -564,10 +885,20 @@ async function pollMemory() {
 }
 
 function updateLiveTelemetry() {
+  try { applyFooterVisibility(); } catch(e) {}
   const now = new Date();
-  const effLang = window.BrowserState ? window.BrowserState.getEffectiveLanguage() : 'pt-BR';
-  const timeStr = now.toLocaleTimeString(effLang, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  
+  let effLang = 'pt-BR';
+  try {
+    effLang = window.BrowserState ? window.BrowserState.getEffectiveLanguage() : 'pt-BR';
+  } catch(e) { effLang = 'pt-BR'; }
+  let timeStr = '';
+  try {
+    timeStr = now.toLocaleTimeString(effLang, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  } catch(e) {
+    timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  try {
   // 1. Time / Clock
   const statusTime = document.getElementById('status-time');
   if (statusTime) statusTime.textContent = timeStr;
@@ -578,13 +909,17 @@ function updateLiveTelemetry() {
     const minutes = String(now.getMinutes()).padStart(2, '0');
     ntClock.textContent = `${hours}:${minutes}`;
   }
+  } catch(e) {}
 
+  try {
   // 2. Roast theme level
   const statusRoastText = document.getElementById('status-roast-text');
   if (statusRoastText && window.BrowserState && window.CoffeeI18n) {
     statusRoastText.textContent = window.CoffeeI18n.t(`roast_${window.BrowserState.roast || 'medio'}`);
   }
+  } catch(e) {}
 
+  try {
   // 3. Online / Offline & Latency Status
   const statusOnlineDot = document.getElementById('status-online-dot');
   const statusOnlineText = document.getElementById('status-online-text');
@@ -626,7 +961,9 @@ function updateLiveTelemetry() {
       statusLatencyValue.style.color = 'var(--mut)';
     }
   }
+  } catch(e) {}
 
+  try {
   // 4. Real Memory RAM Status
   const statusMemoryValue = document.getElementById('status-memory-value');
   if (statusMemoryValue) {
@@ -655,7 +992,9 @@ function updateLiveTelemetry() {
       statusMemoryValue.style.color = 'var(--t2)';
     }
   }
+  } catch(e) {}
 
+  try {
   // 5. Coador Shields Status
   const statusShieldsText = document.getElementById('status-shields-text');
   if (statusShieldsText && window.CoffeeI18n) {
@@ -668,6 +1007,7 @@ function updateLiveTelemetry() {
       statusShieldsText.style.color = 'var(--green)';
     }
   }
+  } catch(e) {}
 }
 
 function showToastNotification(message) {
